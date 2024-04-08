@@ -1,3 +1,4 @@
+use owo_colors::OwoColorize;
 use std::process::{self, exit, Command, Stdio};
 use std::sync::mpsc;
 use std::thread;
@@ -27,6 +28,32 @@ const FAN_AMOUNT: u8 = 1; // Default value when none of the other options are sp
 // Input your gpu number here (if you have 1 gpu its normally nought so just leave it)
 const GPU_NUMBER: u8 = 0;
 
+// Determine the RGB value based on the temperature
+fn rgb_temp(temp: u8) -> (u8, u8, u8) {
+    let blue = if temp < 38 {
+        255 - ((38 - temp) * 5)
+    } else if temp < 70 {
+        0
+    } else {
+        (temp - 70) * 3
+    };
+    let green = if temp < 38 {
+        temp * 2
+    } else if temp < 70 {
+        0
+    } else {
+        (temp - 70) * 2
+    };
+    let red = if temp < 38 {
+        0
+    } else if temp < 70 {
+        (temp - 38) * 2
+    } else {
+        255
+    };
+    (red, green, blue)
+}
+
 fn check_sudo() {
     if let Ok(user) = std::env::var("USER") {
         if user != "root" {
@@ -39,28 +66,31 @@ fn check_sudo() {
     }
 }
 
-fn temp_func() -> String {
+fn temp_func() -> u8 {
     let temp = Command::new("nvidia-smi")
         .arg("--query-gpu=temperature.gpu")
         .arg("--format=csv,noheader")
         .stdout(Stdio::piped())
         .output()
         .unwrap();
-    String::from_utf8(temp.stdout).unwrap()
+    let temp_str = String::from_utf8(temp.stdout).unwrap();
+    // Remove any newline characters from the string
+    let temp_cleaned = temp_str.trim().to_string();
+    let temp_u8: u8 = temp_cleaned.parse().unwrap();
+    temp_u8
 }
 
 fn sleep() {
     thread::sleep(Duration::from_secs(REFRESH_TIME.into()));
 }
 
-fn temp_loop() -> i32 {
-    let mut speed_output = 0;
-    let temp = temp_func();
-    let target: i32 = temp.trim().parse().expect("Wanted a number");
-    let mut speed_output_diff = 999;
-    let speed: [i32; 10] = [10, 20, 30, 40, 59, 70, 80, 90, 95, 100];
-    for x in speed {
-        let diff = (x - target).abs();
+fn temp_loop() -> u8 {
+    let mut speed_output: u8 = 0;
+    let temp: u8 = temp_func();
+    let mut speed_output_diff: u8 = 255;
+    let speed: [u8; 10] = [10, 20, 30, 40, 59, 70, 80, 90, 95, 100];
+    for &x in speed.iter() {
+        let diff = if x > temp { x - temp } else { temp - x };
 
         if diff < speed_output_diff {
             speed_output = x;
@@ -68,7 +98,7 @@ fn temp_loop() -> i32 {
             speed_output_diff = diff;
         }
     }
-    if temp > 80.to_string() {
+    if temp > 80 {
         speed_output += 20;
     }
     if speed_output > 100 {
@@ -128,36 +158,63 @@ fn main() {
         let temp_capture = temp_capture();
         let speed_output = temp_loop();
         let temp = temp_func();
+        let rgb_value_temp = rgb_temp(temp.into());
+        let rgb_value_speed_output = rgb_temp(speed_output.into());
         sleep();
 
-        let gpu_temp_str = format!("gpu_temp {}", temp);
-        let fan_speed_output_str = format!("fan_speed_output {}", speed_output);
-        let skip = format!("Skip command as speed has not changed");
+        let gpu_temp_str = format!("gpu temp: {}°C", temp);
+        let fan_speed_output_str = format!("Current fan speed: {}%", speed_output);
+        let skip = format!(
+            "Skipped execution as speed has not changed from {}",
+            speed_output
+        );
+        let skip_changed = format!("Changed Speed to {}", speed_output);
 
         // Get the terminal size
         if let Some(size) = tsize::get() {
             let width = size.cols as usize; // Convert cols to usize
+            let height = size.rows as usize; // Convert rows to usize
 
             // Calculate the center position
             let temp_center = (width - gpu_temp_str.len()) / 2;
             let speed_output_center = (width - fan_speed_output_str.len()) / 2;
             let skip_center = (width - skip.len()) / 2;
+            let skip_changed_center = (width - skip_changed.len()) / 2;
 
+            // Calculate vertical centering
+            let vertical_center = height / 2;
+
+            // Clear the terminal before printing (optional)
+            print!("\x1B[2J\x1B[1;1H");
+
+            // Use the vertical center to print the strings in the middle of the screen
+            for _ in 0..vertical_center - 1 {
+                println!();
+            }
             // Print the formatted output at the calculated center positions
             println!(
                 "{: >width$}",
-                gpu_temp_str,
+                gpu_temp_str.truecolor(rgb_value_temp.0, rgb_value_temp.1, rgb_value_temp.2),
                 width = temp_center + gpu_temp_str.len()
             );
             println!(
                 "{: >width$}",
-                fan_speed_output_str,
+                fan_speed_output_str.truecolor(
+                    rgb_value_speed_output.0,
+                    rgb_value_speed_output.1,
+                    rgb_value_speed_output.2
+                ),
                 width = speed_output_center + fan_speed_output_str.len()
             );
-            println!("{: >width$}", skip, width = skip_center + skip.len());
 
             if speed_output == temp_capture_call.into() {
+                println!("{: >width$}", skip, width = skip_center + skip.len());
             } else {
+                println!(
+                    "{: >width$}",
+                    skip_changed,
+                    width = skip_changed_center + skip_changed.len()
+                );
                 for faninc in 0..FAN_AMOUNT {
                     Command::new("nvidia-settings")
                         .arg("-a")
