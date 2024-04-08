@@ -3,6 +3,13 @@
 version = 3
 
 [[package]]
+name = "Rust-GPU-Fan-Control"
+version = "0.1.0"
+dependencies = [
+ "termsize",
+]
+
+[[package]]
 name = "atty"
 version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -49,13 +56,6 @@ name = "numtoa"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b8f8bdf33df195859076e54ab11ee78a1b208382d3a26ec40d142ffc1ecc49ef"
-
-[[package]]
-name = "nvidia-rust"
-version = "0.1.0"
-dependencies = [
- "termsize",
-]
 
 [[package]]
 name = "redox_syscall"

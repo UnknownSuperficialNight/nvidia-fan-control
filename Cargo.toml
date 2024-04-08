@@ -1,5 +1,5 @@
 [package]
-name = "nvidia-rust"
+name = "Rust-GPU-Fan-Control"
 version = "0.1.0"
 edition = "2021"
 
