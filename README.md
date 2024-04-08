@@ -37,3 +37,11 @@ git clone https://github.com/UnknownSuperficialNight/nvidia-fan-control.git
 cd nvidia-fan-control
 sudo ./Bash_version/nvidia-fan-ctrl.sh
 ```
+
+# HOW TO CUSTOMIZE THE SPEEDS
+
+The speed array in both versions is used to customize the speed. It will by default find the closest value relative to the current temperature. So, if the lowest value in the array is `59°C` and your current temp is `30°C`, then `59%` speed will be selected. However, if in the array you have the current temp of `30°C` and in the speed array you have these values `[26, 35, 59, 80]`, then in this case, it will choose `26` as it's closest to the current temp.
+
+Thus, change the array how you see fit to make it work for you. I've set it up to work for my GPU as it can only be at 59 speed at minimum.
+
+Also, you can change the code. Currently, I have it set so that if the temp is greater than 80°C, then it adds 20 to the speed_output variable, thus making the fan speed 100%. It also ensures the fan speed does not go over 100%.

@@ -2,7 +2,7 @@
 #USER VARIABLES INPUT HERE
 fan_amount=1 # this is my fan ammount change it to your gpu fan amount
 refresh_time=5 # this is the amount of time to refresh (in seconds)
-speed=("59" "70" "80" "90" "93" "95" "97" "100")
+speed=("10" "20" "30" "40" "59" "70" "80" "100")
 #USER VARIABLES END
 check_privileges() {
     if (( EUID != 0 )); then
