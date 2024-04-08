@@ -4,11 +4,6 @@ nvidia fan control utility wayland compatible
 explanation:
 i think the title says it all it manages ur gpu fan speed
 
-current minimum and max values in fan speed 
-
-lowest value 10%
-highest value 100%
-
 it has a pre-built fan curve that it will adjust to so u done need to do anything its full automatic just execute with
 
 sudo ./nvidia-rust
