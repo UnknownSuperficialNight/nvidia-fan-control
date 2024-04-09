@@ -1,7 +1,6 @@
 use std::process::{Command, Stdio};
 
-use crate::GPU_NUMBER;
-use crate::SPEED;
+use crate::{GPU_NUMBER, SPEED};
 
 pub fn diff_func() -> u8 {
     let mut speed_output: u8 = 0;
@@ -26,12 +25,7 @@ pub fn diff_func() -> u8 {
 }
 
 pub fn get_current_tmp() -> u8 {
-    let temp = Command::new("nvidia-smi")
-        .arg("--query-gpu=temperature.gpu")
-        .arg("--format=csv,noheader")
-        .stdout(Stdio::piped())
-        .output()
-        .unwrap();
+    let temp = Command::new("nvidia-smi").arg("--query-gpu=temperature.gpu").arg("--format=csv,noheader").stdout(Stdio::piped()).output().unwrap();
     let temp_str = String::from_utf8(temp.stdout).unwrap();
     // Remove any newline characters from the string
     let temp_cleaned = temp_str.trim().to_string();
@@ -48,9 +42,5 @@ pub fn cleanup() {
     //                              ┌─────────────────┐
     //                              │ Set Gpu to auto │
     //                              └─────────────────┘
-    Command::new("nvidia-settings")
-        .arg("-a")
-        .arg(&format!("[gpu:{}]/GPUFanControlState=0", GPU_NUMBER))
-        .output()
-        .expect("nvidia-settings command failed to execute");
+    Command::new("nvidia-settings").arg("-a").arg(&format!("[gpu:{}]/GPUFanControlState=0", GPU_NUMBER)).output().expect("nvidia-settings command failed to execute");
 }

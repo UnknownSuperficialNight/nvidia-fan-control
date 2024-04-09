@@ -1,13 +1,11 @@
-use clap::{command, Arg, ArgAction};
-use owo_colors::OwoColorize;
-use std::env;
 use std::path::Path;
-
 use std::process::{self, exit, Command};
 use std::sync::mpsc;
-use std::thread;
-
 use std::time::Duration;
+use std::{env, thread};
+
+use clap::{command, Arg, ArgAction};
+use owo_colors::OwoColorize;
 use termsize as tsize;
 
 mod update_func_logic;
@@ -32,11 +30,7 @@ const FAN_AMOUNT: u8 = 3;
 const FAN_AMOUNT: u8 = 4;
 
 // Input your gpu fan amount here
-#[cfg(not(any(
-    feature = "fan_amount_2",
-    feature = "fan_amount_3",
-    feature = "fan_amount_4"
-)))]
+#[cfg(not(any(feature = "fan_amount_2", feature = "fan_amount_3", feature = "fan_amount_4")))]
 const FAN_AMOUNT: u8 = 1; // Default value when none of the other options are specified
 
 // Input your gpu number here (if you have 1 gpu its normally nought so just leave it)
@@ -96,34 +90,10 @@ fn main() {
 
     // Set flags
     let args = command!()
-        .arg(
-            Arg::new("skip-update-check")
-                .short('s')
-                .long("skip-update")
-                .help("Skip the update check")
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new("update-now")
-                .short('u')
-                .long("update")
-                .help("update the binary to a new version if available")
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new("no-tui")
-                .short('n')
-                .long("no_tui_output")
-                .help("no text user interface output (useful for running in the background)")
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new("version-num")
-                .short('v')
-                .long("version")
-                .help("Display the current version")
-                .action(ArgAction::SetTrue),
-        )
+        .arg(Arg::new("skip-update-check").short('s').long("skip-update").help("Skip the update check").action(ArgAction::SetTrue))
+        .arg(Arg::new("update-now").short('u').long("update").help("update the binary to a new version if available").action(ArgAction::SetTrue))
+        .arg(Arg::new("no-tui").short('n').long("no_tui_output").help("no text user interface output (useful for running in the background)").action(ArgAction::SetTrue))
+        .arg(Arg::new("version-num").short('v').long("version").help("Display the current version").action(ArgAction::SetTrue))
         .get_matches();
     {
         let binary_path = if let Ok(path) = env::current_exe() {
@@ -158,30 +128,20 @@ fn main() {
         };
 
         if !args.get_flag("skip-update-check") && !args.get_flag("update-now") {
-            let checking_repo_version = is_current_version_older(
-                "https://github.com/UnknownSuperficialNight/nvidia-fan-control",
-                VERSION,
-            );
+            let checking_repo_version = is_current_version_older("https://github.com/UnknownSuperficialNight/nvidia-fan-control", VERSION);
             let (is_older, repo_version) = match checking_repo_version {
                 Ok((is_older, version)) => (is_older, version),
                 _ => (false, String::from("0.0.0")), // Default values in case of an error
             };
             if is_older {
-                println!(
-                    "Current Version: \"{VERSION}\" is behind repo: \"{}\"",
-                    repo_version
-                );
-                println!(
-                    "Please update to the new version using \"sudo ./{} -u\"",
-                    binary_path
-                );
+                println!("Current Version: \"{VERSION}\" is behind repo: \"{}\"", repo_version);
+                println!("Please update to the new version using \"sudo ./{} -u\"", binary_path);
                 println!("Resuming normal operation in 10 seconds");
                 thread::sleep(Duration::from_secs(10));
             }
         }
         if args.get_flag("update-now") {
-            let binary_name_capitalized =
-                format!("{}{}", &binary_path[..1].to_uppercase(), &binary_path[1..]);
+            let binary_name_capitalized = format!("{}{}", &binary_path[..1].to_uppercase(), &binary_path[1..]);
             let current_exe_dir_path = &format!("{}/{}", current_exe_dir, binary_path);
             // println!(
             //     "binary_name_capitalized: {} | current_exe_dir_path: {}",
@@ -206,14 +166,7 @@ fn main() {
         if args.get_flag("no-tui") {
             if speed_output != Into::<u8>::into(temp_capture_call) {
                 for faninc in 0..FAN_AMOUNT {
-                    Command::new("nvidia-settings")
-                        .arg("-a")
-                        .arg(&format!(
-                            "GPUTargetFanSpeed[fan:{}]={}",
-                            faninc, speed_output
-                        ))
-                        .output()
-                        .expect("nvidia-settings command failed to execute");
+                    Command::new("nvidia-settings").arg("-a").arg(&format!("GPUTargetFanSpeed[fan:{}]={}", faninc, speed_output)).output().expect("nvidia-settings command failed to execute");
                 }
             }
             temp_capture_call = temp_capture;
@@ -223,10 +176,7 @@ fn main() {
 
             let gpu_temp_str = format!("gpu temp: {}°C", temp);
             let fan_speed_output_str = format!("Current fan speed: {}%", speed_output);
-            let skip = format!(
-                "Skipped execution as speed has not changed from {}",
-                speed_output
-            );
+            let skip = format!("Skipped execution as speed has not changed from {}", speed_output);
             let skip_changed = format!("Changed Speed to {}", speed_output);
 
             // Get the terminal size
@@ -251,38 +201,19 @@ fn main() {
                     println!();
                 }
                 // Print the formatted output at the calculated center positions
+                println!("{: >width$}", gpu_temp_str.truecolor(rgb_value_temp.0, rgb_value_temp.1, rgb_value_temp.2), width = temp_center + gpu_temp_str.len());
                 println!(
                     "{: >width$}",
-                    gpu_temp_str.truecolor(rgb_value_temp.0, rgb_value_temp.1, rgb_value_temp.2),
-                    width = temp_center + gpu_temp_str.len()
-                );
-                println!(
-                    "{: >width$}",
-                    fan_speed_output_str.truecolor(
-                        rgb_value_speed_output.0,
-                        rgb_value_speed_output.1,
-                        rgb_value_speed_output.2
-                    ),
+                    fan_speed_output_str.truecolor(rgb_value_speed_output.0, rgb_value_speed_output.1, rgb_value_speed_output.2),
                     width = speed_output_center + fan_speed_output_str.len()
                 );
 
                 if speed_output == Into::<u8>::into(temp_capture_call) {
                     println!("{: >width$}", skip, width = skip_center + skip.len());
                 } else {
-                    println!(
-                        "{: >width$}",
-                        skip_changed,
-                        width = skip_changed_center + skip_changed.len()
-                    );
+                    println!("{: >width$}", skip_changed, width = skip_changed_center + skip_changed.len());
                     for faninc in 0..FAN_AMOUNT {
-                        Command::new("nvidia-settings")
-                            .arg("-a")
-                            .arg(&format!(
-                                "GPUTargetFanSpeed[fan:{}]={}",
-                                faninc, speed_output
-                            ))
-                            .output()
-                            .expect("nvidia-settings command failed to execute");
+                        Command::new("nvidia-settings").arg("-a").arg(&format!("GPUTargetFanSpeed[fan:{}]={}", faninc, speed_output)).output().expect("nvidia-settings command failed to execute");
                     }
                 }
                 temp_capture_call = temp_capture;
