@@ -2,26 +2,21 @@ use std::process::{Command, Stdio};
 
 use crate::{GPU_NUMBER, SPEED};
 
-pub fn diff_func() -> u8 {
-    let mut speed_output: u8 = 0;
-    let temp: u8 = get_current_tmp();
-    let mut speed_output_diff: u8 = 255;
-    for &x in SPEED.iter() {
+pub fn diff_func(temp: u8) -> u8 {
+    let (mut speed_output, _) = SPEED.iter().fold((0, u8::MAX), |(speed, min_diff), &x| {
         let diff = if x > temp { x - temp } else { temp - x };
-
-        if diff < speed_output_diff {
-            speed_output = x;
-
-            speed_output_diff = diff;
+        if diff < min_diff {
+            (x, diff)
+        } else {
+            (speed, min_diff)
         }
-    }
+    });
+
     if temp > 80 {
-        speed_output += 20;
+        speed_output = speed_output.saturating_add(20);
     }
-    if speed_output > 100 {
-        speed_output = 100
-    }
-    speed_output
+
+    speed_output.min(100)
 }
 
 pub fn get_current_tmp() -> u8 {

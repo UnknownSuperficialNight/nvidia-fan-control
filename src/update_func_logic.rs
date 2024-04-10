@@ -19,26 +19,31 @@ pub fn is_current_version_older(repo_url: &str, compiled_version: &str) -> Resul
         .and_then(|version| version.trim().strip_prefix('"').and_then(|v| v.strip_suffix('"')))
         .ok_or("Version not found in Cargo.toml")?;
 
-    // Compare with the compiled version
-    let is_older = {
-        let compiled_parts: Vec<_> = compiled_version.split('.').collect();
-        let repo_parts: Vec<_> = repo_version.split('.').collect();
-
-        if let Some((repo, compiled)) = repo_parts.iter().zip(compiled_parts.iter()).next() {
-            let repo_num: u64 = repo.parse()?;
-            let compiled_num: u64 = compiled.parse()?;
-
-            if repo_num > compiled_num {
-                return Ok((true, repo_version.to_string()));
-            } else {
-                return Ok((false, repo_version.to_string()));
-            }
-        }
-
-        false
-    };
+    // Compare the versions
+    let is_older = compare_versions(compiled_version, repo_version)?;
 
     Ok((is_older, repo_version.to_string()))
+}
+
+fn compare_versions(compiled_version: &str, repo_version: &str) -> Result<bool, Box<dyn std::error::Error>> {
+    let compiled_parts: Vec<u64> = compiled_version.split('.').map(|part| part.parse::<u64>()).collect::<Result<_, _>>()?;
+    let repo_parts: Vec<u64> = repo_version.split('.').map(|part| part.parse::<u64>()).collect::<Result<_, _>>()?;
+
+    let max_length = std::cmp::max(compiled_parts.len(), repo_parts.len());
+
+    for i in 0..max_length {
+        let compiled_part = *compiled_parts.get(i).unwrap_or(&0);
+        let repo_part = *repo_parts.get(i).unwrap_or(&0);
+
+        if repo_part > compiled_part {
+            return Ok(true);
+        } else if compiled_part > repo_part {
+            return Ok(false);
+        }
+    }
+
+    // If all parts are equal, the version is not older
+    Ok(false)
 }
 
 pub fn update_func(binary_name: String, file_path: &Path) {

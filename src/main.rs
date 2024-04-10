@@ -90,6 +90,7 @@ fn main() {
 
     // Set flags
     let args = command!()
+        .disable_version_flag(true)
         .arg(Arg::new("skip-update-check").short('s').long("skip-update").help("Skip the update check").action(ArgAction::SetTrue))
         .arg(Arg::new("update-now").short('u').long("update").help("update the binary to a new version if available").action(ArgAction::SetTrue))
         .arg(Arg::new("no-tui").short('n').long("no_tui_output").help("no text user interface output (useful for running in the background)").action(ArgAction::SetTrue))
@@ -143,10 +144,6 @@ fn main() {
         if args.get_flag("update-now") {
             let binary_name_capitalized = format!("{}{}", &binary_path[..1].to_uppercase(), &binary_path[1..]);
             let current_exe_dir_path = &format!("{}/{}", current_exe_dir, binary_path);
-            // println!(
-            //     "binary_name_capitalized: {} | current_exe_dir_path: {}",
-            //     binary_name_capitalized, current_exe_dir_path
-            // );
 
             update_func(binary_name_capitalized, Path::new(current_exe_dir_path));
             exit(0);
@@ -158,18 +155,17 @@ fn main() {
         }
     }
 
-    let mut temp_capture_call = diff_func();
+    let mut temp_capture_call: u8 = 8;
     loop {
-        let temp_capture = diff_func();
-        let speed_output = diff_func();
         let temp = get_current_tmp();
+        let speed_output = diff_func(temp);
         if args.get_flag("no-tui") {
             if speed_output != Into::<u8>::into(temp_capture_call) {
                 for faninc in 0..FAN_AMOUNT {
                     Command::new("nvidia-settings").arg("-a").arg(&format!("GPUTargetFanSpeed[fan:{}]={}", faninc, speed_output)).output().expect("nvidia-settings command failed to execute");
                 }
             }
-            temp_capture_call = temp_capture;
+            temp_capture_call = speed_output;
         } else {
             let rgb_value_temp = rgb_temp(temp);
             let rgb_value_speed_output = rgb_temp(speed_output);
@@ -216,7 +212,7 @@ fn main() {
                         Command::new("nvidia-settings").arg("-a").arg(&format!("GPUTargetFanSpeed[fan:{}]={}", faninc, speed_output)).output().expect("nvidia-settings command failed to execute");
                     }
                 }
-                temp_capture_call = temp_capture;
+                temp_capture_call = speed_output;
             }
         }
         sleep();
