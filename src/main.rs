@@ -95,6 +95,7 @@ fn main() {
         .arg(Arg::new("update-now").short('u').long("update").help("update the binary to a new version if available").action(ArgAction::SetTrue))
         .arg(Arg::new("no-tui").short('n').long("no_tui_output").help("no text user interface output (useful for running in the background)").action(ArgAction::SetTrue))
         .arg(Arg::new("version-num").short('v').long("version").help("Display the current version").action(ArgAction::SetTrue))
+        .arg(Arg::new("test-true").short('t').long("test_fan").help("Test by setting gpu fan to 100% so you know it has control over the gpu").action(ArgAction::SetTrue))
         .get_matches();
     {
         let binary_path = if let Ok(path) = env::current_exe() {
@@ -152,6 +153,18 @@ fn main() {
         if args.get_flag("version-num") {
             println!("Version: {}", VERSION);
             exit(0);
+        }
+
+        if args.get_flag("test-true") {
+            println!("Test starting");
+            for faninc in 0..FAN_AMOUNT {
+                Command::new("nvidia-settings").arg("-a").arg(&format!("GPUTargetFanSpeed[fan:{}]=100", faninc)).output().expect("nvidia-settings command failed to execute");
+            }
+            // Wait and prompt the user to press Ctrl+C to exit
+            println!("Press Ctrl+C to exit");
+            loop {
+                thread::sleep(Duration::from_secs(1));
+            }
         }
     }
 
