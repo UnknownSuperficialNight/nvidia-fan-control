@@ -5,7 +5,7 @@ The `nvidia-fan-control` utility is a user-friendly tool designed for controllin
 
 ### Features
 - **Automatic Fan Curve**: The utility implements a pre-configured fan curve that intelligently adjusts fan speeds according to GPU temperature, ensuring optimal cooling without any user intervention.
-- **Easy Execution**: Run the utility with a simple command: `sudo ./nvidia-rust`.
+- **Easy Execution**: Run the utility with a simple command: `sudo ./Rust-gpu-fan-control`.
 - **Autostart Capabilities**: Can be configured to automatically start with your Linux distribution, providing hassle-free operation from boot.
 
 ### Compatibility
@@ -13,11 +13,12 @@ The `nvidia-fan-control` utility is a user-friendly tool designed for controllin
 - **Open Source Driver**: Compatibility with the open-source `nouveau` driver has not been tested but could potentially work.
 
 ### Usage Instructions
-To engage the automatic fan control:
+To start the automatic fan control:
 
 ```bash
-sudo ./nvidia-rust
+sudo ./Rust-gpu-fan-control
 ```
+If you need help with flags just type `sudo ./Rust-gpu-fan-control --help`
 
 ## Compilation Instructions
 For compiling the Rust version, execute these commands:
@@ -28,7 +29,7 @@ cd nvidia-fan-control
 cargo build --release
 sudo ./target/release/nvidia-rust
 ```
-An optional Rust binary is available in the releases, optimized for minimal binary size.
+~~An optional Rust binary is available in the releases, optimized for minimal binary size.~~ (Not available currently due to issues with rendering on nightly builds)
 
 
 For the Bash version, use these commands:
@@ -42,6 +43,6 @@ sudo ./Bash_version/nvidia-fan-ctrl.sh
 
 The speed array in both versions is used to customize the speed. It will by default find the closest value relative to the current temperature. So, if the lowest value in the array is `59°C` and your current temp is `30°C`, then `59%` speed will be selected. However, if in the array you have the current temp of `30°C` and in the speed array you have these values `[26, 35, 59, 80]`, then in this case, it will choose `26` as it's closest to the current temp.
 
-Thus, change the array how you see fit to make it work for you. I've set it up to work for my GPU as it can only be at 59 speed at minimum.
+Thus, change the array how you see fit to make it work for you. I've set it up to work for my GPU as mine can only be at 59 speed at minimum.
 
 Also, you can change the code. Currently, I have it set so that if the temp is greater than 80°C, then it adds 20 to the speed_output variable, thus making the fan speed 100%. It also ensures the fan speed does not go over 100%.
