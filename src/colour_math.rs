@@ -1,4 +1,5 @@
 // Determine the RGB value based on the temperature
+// Yes this is bad code its a stand in until i get the gradient mathematics worked out
 pub fn rgb_temp(temp: u8) -> (u8, u8, u8) {
     let blue = match temp {
         0..=34 => 206 - ((35 - temp) * 4),
@@ -27,6 +28,8 @@ pub fn rgb_temp(temp: u8) -> (u8, u8, u8) {
     (red, green, blue)
 }
 
+// Added to be used when adding gradient calculations to convert from a human-readable colour format
+// like CMYK to RGB
 fn cmyk_to_rgb(c: u8, m: u8, y: u8, k: u8) -> (u8, u8, u8) {
     let r = 255.0 * (1.0 - c as f32 / 100.0) * (1.0 - k as f32 / 100.0);
     let g = 255.0 * (1.0 - m as f32 / 100.0) * (1.0 - k as f32 / 100.0);

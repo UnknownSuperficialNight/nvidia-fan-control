@@ -17,27 +17,30 @@ use calculations::*;
 mod colour_math;
 use colour_math::rgb_temp;
 
-// Defines interval to refresh
+// Defines interval to refresh screen and screen boundries calculations
 const REFRESH_TIME: u8 = 5;
 
-#[cfg(feature = "fan_amount_2")]
-const FAN_AMOUNT: u8 = 2;
-
-#[cfg(feature = "fan_amount_3")]
-const FAN_AMOUNT: u8 = 3;
-
-#[cfg(feature = "fan_amount_4")]
-const FAN_AMOUNT: u8 = 4;
+//  ╔═══════════════════════════════════════════════════════════════════╗
+//  ║   Define build flags for quick compilation of different fan_args  ║
+//  ╠═══════════════════════════════════════════════════════════════════╣
+#[cfg(feature = "fan_amount_2")] //                                     ║
+const FAN_AMOUNT: u8 = 2; //                                            ║
+                          //                                            ║
+#[cfg(feature = "fan_amount_3")] //                                     ║
+const FAN_AMOUNT: u8 = 3; //                                            ║
+                          //                                            ║
+#[cfg(feature = "fan_amount_4")] //                                     ║
+const FAN_AMOUNT: u8 = 4; //                                            ║
 
 // Input your gpu fan amount here
 #[cfg(not(any(feature = "fan_amount_2", feature = "fan_amount_3", feature = "fan_amount_4")))]
-const FAN_AMOUNT: u8 = 1; // Default value when none of the other options are specified
+const FAN_AMOUNT: u8 = 1; // Default value when none of the other build options are specified
 
 // Input your gpu number here (if you have 1 gpu its normally nought so just leave it)
 pub const GPU_NUMBER: u8 = 0;
 
-// Speed Array
-
+// Finding the nearest neighbor to the current temperature and setting the speed accordingly using
+// this array.
 pub const SPEED: [u8; 10] = [10, 20, 30, 40, 59, 70, 80, 90, 95, 100];
 
 // Used for checking for updates
@@ -47,6 +50,7 @@ const fn get_version() -> &'static str {
 
 const VERSION: &str = get_version();
 
+// Check if user is root
 fn check_sudo() {
     if let Ok(user) = std::env::var("USER") {
         if user != "root" {
@@ -59,8 +63,9 @@ fn check_sudo() {
     }
 }
 
-fn sleep() {
-    thread::sleep(Duration::from_secs(REFRESH_TIME.into()));
+// Sleep calling thread for x seconds
+fn sleep(input_sec: u8) {
+    thread::sleep(Duration::from_secs(input_sec.into()));
 }
 
 fn main() {
@@ -88,7 +93,7 @@ fn main() {
         exit(0);
     });
 
-    // Set flags
+    // Set flags/arguments
     let args = command!()
         .disable_version_flag(true)
         .arg(Arg::new("skip-update-check").short('s').long("skip-update").help("Skip the update check").action(ArgAction::SetTrue))
@@ -98,6 +103,7 @@ fn main() {
         .arg(Arg::new("test-true").short('t').long("test_fan").help("Test by setting gpu fan to 100% so you know it has control over the gpu").action(ArgAction::SetTrue))
         .get_matches();
     {
+        // Get path of the current binary at runtime
         let binary_path = if let Ok(path) = env::current_exe() {
             if let Some(file_name) = path.file_name() {
                 if let Some(name) = file_name.to_str() {
@@ -107,11 +113,11 @@ fn main() {
                     exit(0);
                 }
             } else {
-                println!("Can't find binary_path exiting make a issue on github");
+                println!("Can't find binary_path (path.file_name) exiting make a issue on github");
                 exit(0);
             }
         } else {
-            println!("Can't find binary_path exiting make a issue on github");
+            println!("Can't find binary_path (env::current_exe()) exiting make a issue on github");
             exit(0);
         };
 
@@ -129,6 +135,7 @@ fn main() {
             }
         };
 
+        // Standard update check on boot up prints a message if there is a newer version
         if !args.get_flag("skip-update-check") && !args.get_flag("update-now") {
             let checking_repo_version = is_current_version_older("https://github.com/UnknownSuperficialNight/nvidia-fan-control", VERSION);
             let (is_older, repo_version) = match checking_repo_version {
@@ -139,9 +146,12 @@ fn main() {
                 println!("Current Version: \"{VERSION}\" is behind repo: \"{}\"", repo_version);
                 println!("Please update to the new version using \"sudo ./{} -u\"", binary_path);
                 println!("Resuming normal operation in 10 seconds");
-                thread::sleep(Duration::from_secs(10));
+                sleep(10);
             }
         }
+
+        // Update to the new version on git i.e (Remove current binary download a new replacement binary in
+        // its place)
         if args.get_flag("update-now") {
             let binary_name_capitalized = format!("{}{}", &binary_path[..1].to_uppercase(), &binary_path[1..]);
             let current_exe_dir_path = &format!("{}/{}", current_exe_dir, binary_path);
@@ -150,11 +160,13 @@ fn main() {
             exit(0);
         }
 
+        // Print current compiled version number
         if args.get_flag("version-num") {
             println!("Version: {}", VERSION);
             exit(0);
         }
 
+        // Test Gpu but forcing it to 100% to make sure that the users gpu is responding to commands
         if args.get_flag("test-true") {
             println!("Test starting");
             for faninc in 0..FAN_AMOUNT {
@@ -163,12 +175,14 @@ fn main() {
             // Wait and prompt the user to press Ctrl+C to exit
             println!("Press Ctrl+C to exit");
             loop {
-                thread::sleep(Duration::from_secs(1));
+                sleep(1);
             }
         }
     }
 
+    // Define a variable to hold a starting speed value and to hold the current used/selected speed
     let mut temp_capture_call: u8 = 8;
+
     loop {
         let temp = get_current_tmp();
         let speed_output = diff_func(temp);
@@ -228,6 +242,6 @@ fn main() {
                 temp_capture_call = speed_output;
             }
         }
-        sleep();
+        sleep(REFRESH_TIME);
     }
 }

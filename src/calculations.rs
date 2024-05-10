@@ -2,6 +2,8 @@ use std::process::{Command, Stdio};
 
 use crate::{GPU_NUMBER, SPEED};
 
+// Determine the appropriate speed based on the input temperature,
+// with a potential adjustment if the temperature exceeds a certain threshold i.e 80
 pub fn diff_func(temp: u8) -> u8 {
     let (mut speed_output, _) = SPEED.iter().fold((0, u8::MAX), |(speed, min_diff), &x| {
         let diff = if x > temp { x - temp } else { temp - x };
@@ -19,6 +21,7 @@ pub fn diff_func(temp: u8) -> u8 {
     speed_output.min(100)
 }
 
+// Use NVML C-based library through nvsmi to get current gpu temp
 pub fn get_current_tmp() -> u8 {
     let temp = Command::new("nvidia-smi").arg("--query-gpu=temperature.gpu").arg("--format=csv,noheader").stdout(Stdio::piped()).output().unwrap();
     let temp_str = String::from_utf8(temp.stdout).unwrap();
@@ -28,6 +31,7 @@ pub fn get_current_tmp() -> u8 {
     temp_u8
 }
 
+// Set cpu to auto mode apon script exit using SIGINT/(Ctrl + C)
 pub fn cleanup() {
     //
     //
