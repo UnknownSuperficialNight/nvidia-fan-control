@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# Note This Bash script is a first draft done it around 30 minutes give or take just as a concept to the idea
-# Its fully usable just not updated or improved mainly here for those who prefer Bash scripts to the Rust binary
-# Or for People to easily understand the concept of what the Rust version does without understand Rust code
+# Note: This Bash script is a first draft completed in approximately 30 minutes, intended to convey the basic concept of the idea.
+# It is fully functional but hasn't been updated or optimized. It's provided primarily for those who prefer Bash scripts over the Rust binary
+# or for individuals who want to grasp the concept of the Rust version without understanding Rust code.
 
 #USER VARIABLES INPUT HERE
 fan_amount=1                                     # This is my fan amount change it to your gpu fan amount
