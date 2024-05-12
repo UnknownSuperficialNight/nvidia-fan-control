@@ -63,6 +63,11 @@ fn check_sudo() {
     }
 }
 
+// Convert celcius to fahrenheit for the americans
+fn celcius_to_fahrenheit(input_celcius: u8) -> u8 {
+    (input_celcius as f32 * 1.8 + 32.0) as u8
+}
+
 // Sleep calling thread for x seconds
 fn sleep(input_sec: u8) {
     thread::sleep(Duration::from_secs(input_sec.into()));
@@ -101,6 +106,7 @@ fn main() {
         .arg(Arg::new("no-tui").short('n').long("no_tui_output").help("no text user interface output (useful for running in the background)").action(ArgAction::SetTrue))
         .arg(Arg::new("version-num").short('v').long("version").help("Display the current version").action(ArgAction::SetTrue))
         .arg(Arg::new("test-true").short('t').long("test_fan").help("Test by setting gpu fan to 100% so you know it has control over the gpu").action(ArgAction::SetTrue))
+        .arg(Arg::new("fahrenheit-id").short('f').long("fahrenheit").help("Use fahrenheit instead of celsius").action(ArgAction::SetTrue))
         .get_matches();
     {
         // Get path of the current binary at runtime
@@ -196,8 +202,12 @@ fn main() {
         } else {
             let rgb_value_temp = rgb_temp(temp);
             let rgb_value_speed_output = rgb_temp(speed_output);
-
-            let gpu_temp_str = format!("gpu temp: {}°C", temp);
+            let gpu_temp_str: String;
+            if args.get_flag("fahrenheit-id") {
+                gpu_temp_str = format!("gpu temp: {}°F", celcius_to_fahrenheit(temp));
+            } else {
+                gpu_temp_str = format!("gpu temp: {}°C", temp);
+            };
             let fan_speed_output_str = format!("Current fan speed: {}%", speed_output);
             let skip = format!("Skipped execution as speed has not changed from {}", speed_output);
             let skip_changed = format!("Changed Speed to {}", speed_output);
