@@ -229,6 +229,16 @@ fn main() {
     // Define a variable to hold a starting speed value and to hold the current used/selected speed
     let mut temp_capture_call: u8 = 8;
 
+    // Define width and height variables
+    let mut width: usize = 0;
+    let mut height: usize = 0;
+
+    // Define variables to save current line calculations
+    let mut temp_center: usize = 0;
+    let mut speed_output_center: usize = 0;
+    let mut skip_center: usize = 0;
+    let mut skip_changed_center: usize = 0;
+    let mut vertical_center: usize = 0;
     loop {
         let temp: u8;
         // Added if statement here for later amd gpu intergration
@@ -270,17 +280,21 @@ fn main() {
 
             // Get the terminal size
             if let Ok(size) = terminal_size() {
-                let width = size.0 as usize; // Convert cols to usize
-                let height = size.1 as usize; // Convert rows to usize
+                // Optimize CPU cycles by caching width, height, and other calculations for future iterations.
+                if size.0 as usize != width || size.1 as usize != height {
+                    // Define width and height of current program terminal window
+                    width = size.0 as usize;
+                    height = size.1 as usize;
 
-                // Calculate the center position
-                let temp_center = (width - gpu_temp_str.len()) / 2;
-                let speed_output_center = (width - fan_speed_output_str.len()) / 2;
-                let skip_center = (width - skip.len()) / 2;
-                let skip_changed_center = (width - skip_changed.len()) / 2;
+                    // Calculate the center position
+                    temp_center = (width - gpu_temp_str.len()) / 2;
+                    speed_output_center = (width - fan_speed_output_str.len()) / 2;
+                    skip_center = (width - skip.len()) / 2;
+                    skip_changed_center = (width - skip_changed.len()) / 2;
 
-                // Calculate vertical centering
-                let vertical_center = height / 2;
+                    // Calculate vertical centering
+                    vertical_center = height / 2;
+                }
 
                 // Clear the terminal before printing (optional)
                 print!("\x1B[2J\x1B[1;1H");
