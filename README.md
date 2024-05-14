@@ -37,7 +37,7 @@ cd nvidia-fan-control
 cargo build --release
 sudo ./target/release/nvidia-rust
 ```
-~~An optional Rust binary is available in the releases, optimized for minimal binary size.~~ (Not available currently due to issues with rendering on nightly builds)
+Rust binary's in the releases are optimized for minimal binary size, while also being optimized for speed. <!-- (Not available currently due to issues with rendering on nightly builds) -->
 
 # HOW TO CUSTOMIZE THE SPEEDS
 

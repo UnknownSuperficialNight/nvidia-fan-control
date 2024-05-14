@@ -6,7 +6,7 @@ use std::{env, thread};
 
 use clap::{command, Arg, ArgAction};
 use owo_colors::OwoColorize;
-use termsize as tsize;
+use termion::terminal_size;
 
 mod update_func_logic;
 use update_func_logic::*;
@@ -55,11 +55,30 @@ fn check_sudo() {
     if let Ok(user) = std::env::var("USER") {
         if user != "root" {
             println!("This script must be run with sudo privileges.");
-            process::exit(1);
+            exit(1);
         }
     } else {
         println!("Unable to retrieve user information.");
-        process::exit(1);
+        exit(1);
+    }
+}
+
+fn find_gpu_manufacturer() -> u8 {
+    let output = match Command::new("lspci").arg("-nnk").output() {
+        Ok(output) => output,
+        Err(_) => {
+            eprintln!("Error: Failed to execute lspci command");
+            exit(1);
+        }
+    };
+
+    let output_str = String::from_utf8_lossy(&output.stdout);
+    if output_str.contains("NVIDIA") {
+        0
+    } else if output_str.contains("AMD") {
+        1
+    } else {
+        255
     }
 }
 
@@ -75,6 +94,14 @@ fn sleep(input_sec: u8) {
 
 fn main() {
     check_sudo();
+    // Added if statement here for later amd gpu intergration
+    let gpu_manufacturer = find_gpu_manufacturer();
+
+    // If find_gpu_manufacturer can't find a supported gpu exit the program
+    if gpu_manufacturer == 255 {
+        eprintln!("Error: Unknown GPU or no GPU found");
+        exit(1)
+    }
 
     // Create a channel for communication between threads
     let (tx, rx) = mpsc::channel();
@@ -91,8 +118,14 @@ fn main() {
         // Wait for the signal from the main thread
         rx.recv().expect("Could not receive from channel.");
 
-        // Execute the cleanup function
-        cleanup();
+        // Added if statement here for later amd gpu intergration
+        if gpu_manufacturer == 0 {
+            // Execute the cleanup function for nvidia
+            cleanup_nvidia();
+        } else {
+            eprintln!("Error: Unknown GPU or no GPU found");
+            exit(1);
+        }
 
         // Exit the program
         exit(0);
@@ -175,8 +208,15 @@ fn main() {
         // Test Gpu but forcing it to 100% to make sure that the users gpu is responding to commands
         if args.get_flag("test-true") {
             println!("Test starting");
-            for faninc in 0..FAN_AMOUNT {
-                Command::new("nvidia-settings").arg("-a").arg(&format!("GPUTargetFanSpeed[fan:{}]=100", faninc)).output().expect("nvidia-settings command failed to execute");
+
+            // Added if statement here for later amd gpu intergration
+            if gpu_manufacturer == 0 {
+                for faninc in 0..FAN_AMOUNT {
+                    Command::new("nvidia-settings").arg("-a").arg(&format!("GPUTargetFanSpeed[fan:{}]=100", faninc)).output().expect("nvidia-settings command failed to execute");
+                }
+            } else {
+                eprintln!("Error: Unknown GPU or no GPU found");
+                exit(1);
             }
             // Wait and prompt the user to press Ctrl+C to exit
             println!("Press Ctrl+C to exit");
@@ -190,12 +230,25 @@ fn main() {
     let mut temp_capture_call: u8 = 8;
 
     loop {
-        let temp = get_current_tmp();
+        let temp: u8;
+        // Added if statement here for later amd gpu intergration
+        if gpu_manufacturer == 0 {
+            temp = get_current_nvidia_temp();
+        } else {
+            eprintln!("Error: Unknown GPU or no GPU found");
+            exit(1);
+        }
         let speed_output = diff_func(temp);
         if args.get_flag("no-tui") {
             if speed_output != Into::<u8>::into(temp_capture_call) {
-                for faninc in 0..FAN_AMOUNT {
-                    Command::new("nvidia-settings").arg("-a").arg(&format!("GPUTargetFanSpeed[fan:{}]={}", faninc, speed_output)).output().expect("nvidia-settings command failed to execute");
+                // Added if statement here for later amd gpu intergration
+                if gpu_manufacturer == 0 {
+                    for faninc in 0..FAN_AMOUNT {
+                        Command::new("nvidia-settings").arg("-a").arg(&format!("GPUTargetFanSpeed[fan:{}]={}", faninc, speed_output)).output().expect("nvidia-settings command failed to execute");
+                    }
+                } else {
+                    eprintln!("Error: Unknown GPU or no GPU found");
+                    exit(1);
                 }
             }
             temp_capture_call = speed_output;
@@ -212,10 +265,13 @@ fn main() {
             let skip = format!("Skipped execution as speed has not changed from {}", speed_output);
             let skip_changed = format!("Changed Speed to {}", speed_output);
 
+            // Hide the cursor
+            print!("\x1B[?25l");
+
             // Get the terminal size
-            if let Some(size) = tsize::get() {
-                let width = size.cols as usize; // Convert cols to usize
-                let height = size.rows as usize; // Convert rows to usize
+            if let Ok(size) = terminal_size() {
+                let width = size.0 as usize; // Convert cols to usize
+                let height = size.1 as usize; // Convert rows to usize
 
                 // Calculate the center position
                 let temp_center = (width - gpu_temp_str.len()) / 2;
@@ -229,10 +285,19 @@ fn main() {
                 // Clear the terminal before printing (optional)
                 print!("\x1B[2J\x1B[1;1H");
 
-                // Use the vertical center to print the strings in the middle of the screen
-                for _ in 0..vertical_center - 1 {
-                    println!();
-                }
+                // Debug print statements
+                // println!("gpu_temp_str: {}", gpu_temp_str.len());
+                // println!("Width: {}", width);
+                // println!("Height: {}", height);
+                // println!("Temperature Center: {}", temp_center);
+                // println!("Speed Output Center: {}", speed_output_center);
+                // println!("Skip Center: {}", skip_center);
+                // println!("Skip Changed Center: {}", skip_changed_center);
+                // println!("Vertical Center: {}", vertical_center);
+
+                // Move the cursor to the desired position
+                print!("\x1B[{};H", vertical_center);
+
                 // Print the formatted output at the calculated center positions
                 println!("{: >width$}", gpu_temp_str.truecolor(rgb_value_temp.0, rgb_value_temp.1, rgb_value_temp.2), width = temp_center + gpu_temp_str.len());
                 println!(
@@ -241,15 +306,29 @@ fn main() {
                     width = speed_output_center + fan_speed_output_str.len()
                 );
 
-                if speed_output == Into::<u8>::into(temp_capture_call) {
-                    println!("{: >width$}", skip, width = skip_center + skip.len());
-                } else {
-                    println!("{: >width$}", skip_changed, width = skip_changed_center + skip_changed.len());
-                    for faninc in 0..FAN_AMOUNT {
-                        Command::new("nvidia-settings").arg("-a").arg(&format!("GPUTargetFanSpeed[fan:{}]={}", faninc, speed_output)).output().expect("nvidia-settings command failed to execute");
+                // Added if statement here for later amd gpu intergration
+                if gpu_manufacturer == 0 {
+                    if speed_output == Into::<u8>::into(temp_capture_call) {
+                        println!("{: >width$}", skip, width = skip_center + skip.len());
+                    } else {
+                        println!("{: >width$}", skip_changed, width = skip_changed_center + skip_changed.len());
+                        for faninc in 0..FAN_AMOUNT {
+                            Command::new("nvidia-settings")
+                                .arg("-a")
+                                .arg(&format!(
+                                    "
+                GPUTargetFanSpeed[fan:{}]={}",
+                                    faninc, speed_output
+                                ))
+                                .output()
+                                .expect("nvidia-settings command failed to execute");
+                        }
                     }
+                    temp_capture_call = speed_output;
+                } else {
+                    eprintln!("Error: Unknown GPU or no GPU found");
+                    exit(1);
                 }
-                temp_capture_call = speed_output;
             }
         }
         sleep(REFRESH_TIME);

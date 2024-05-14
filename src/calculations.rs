@@ -22,7 +22,7 @@ pub fn diff_func(temp: u8) -> u8 {
 }
 
 // Use NVML C-based library through nvsmi to get current gpu temp
-pub fn get_current_tmp() -> u8 {
+pub fn get_current_nvidia_temp() -> u8 {
     let temp = Command::new("nvidia-smi").arg("--query-gpu=temperature.gpu").arg("--format=csv,noheader").stdout(Stdio::piped()).output().unwrap();
     let temp_str = String::from_utf8(temp.stdout).unwrap();
     // Remove any newline characters from the string
@@ -32,7 +32,7 @@ pub fn get_current_tmp() -> u8 {
 }
 
 // Set cpu to auto mode apon script exit using SIGINT/(Ctrl + C)
-pub fn cleanup() {
+pub fn cleanup_nvidia() {
     //
     //
     //
@@ -42,4 +42,5 @@ pub fn cleanup() {
     //                              │ Set Gpu to auto │
     //                              └─────────────────┘
     Command::new("nvidia-settings").arg("-a").arg(&format!("[gpu:{}]/GPUFanControlState=0", GPU_NUMBER)).output().expect("nvidia-settings command failed to execute");
+    print!("\x1B[?25h");
 }
