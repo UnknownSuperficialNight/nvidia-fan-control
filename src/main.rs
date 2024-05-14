@@ -256,7 +256,7 @@ fn main() {
             }
 
             // Get a sha256sum of the updated binary
-            let updated_bin_sha256 = compute_file_sha256(current_exe_dir_path);
+            let updated_bin_sha256 = compute_file_sha256(file_path_tmp);
             let updated_bin_sha256_result = match updated_bin_sha256 {
                 Some(hash) => format!("{}", hash),
                 None => "Failed to compute SHA-256 hash of the file.".to_string(),
