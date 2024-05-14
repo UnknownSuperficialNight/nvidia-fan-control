@@ -251,7 +251,8 @@ fn main() {
             let mut repo_bin_sha256_result: String = "Error".to_string();
             for checksum in &checksums_vec {
                 if checksum.key == CAPITALIZED_BINARY_NAME {
-                    repo_bin_sha256_result = checksum.value.clone();
+                    let cleaned_value = checksum.value.trim_matches('\"');
+                    repo_bin_sha256_result = cleaned_value.to_string();
                 }
             }
 

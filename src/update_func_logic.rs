@@ -103,10 +103,9 @@ pub fn update_func(binary_name: &str, file_path_tmp: &Path) -> Vec<Checksum> {
 
             // Extract the response body as bytes
             let response_bytes = response.bytes().await.unwrap();
-            let response_str = std::str::from_utf8(&response_bytes).unwrap(); // Convert bytes to UTF-8 string
 
             // Parse checksums.json as JSON
-            let checksums_json: serde_json::Value = serde_json::from_str(&response_str).unwrap();
+            let checksums_json: serde_json::Value = serde_json::from_slice(&response_bytes).unwrap();
 
             if let Some(object) = checksums_json.as_object() {
                 for (key, value) in object {
