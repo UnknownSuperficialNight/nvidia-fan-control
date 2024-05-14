@@ -1,10 +1,16 @@
-use std::fs::{File, Permissions};
+use std::fs::{rename, File, Permissions};
 use std::io::Write;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 
 use indicatif::{ProgressBar, ProgressStyle};
 use reqwest::header;
+
+#[derive(Debug)]
+pub struct Checksum {
+    pub key: String,
+    pub value: String,
+}
 
 pub fn is_current_version_older(repo_url: &str, compiled_version: &str) -> Result<(bool, String), Box<dyn std::error::Error>> {
     // Fetch the Cargo.toml file from the repository
@@ -46,13 +52,24 @@ fn compare_versions(compiled_version: &str, repo_version: &str) -> Result<bool, 
     Ok(false)
 }
 
-pub fn update_func(binary_name: String, file_path: &Path) {
-    tokio::runtime::Runtime::new().unwrap().block_on(async {
+pub fn update_func_commit(file_path: &Path, file_path_tmp: &Path) {
+    if let Err(e) = std::fs::remove_file(file_path) {
+        eprintln!("Failed to delete old file: {}", e);
+    } else {
+        match rename(file_path_tmp, file_path) {
+            Ok(_) => {}
+            Err(e) => eprintln!("Failed to rename file: {}", e),
+        }
+    }
+}
+
+pub fn update_func(binary_name: &str, file_path_tmp: &Path) -> Vec<Checksum> {
+    let checksums_result = tokio::runtime::Runtime::new().unwrap().block_on(async {
         let release_url = "https://api.github.com/repos/UnknownSuperficialNight/nvidia-fan-control/releases/latest";
 
         let client = reqwest::Client::new();
 
-        let response = client.get(release_url).header(header::USER_AGENT, "User-Agent: Nvidia Fanctrl").send().await.unwrap();
+        let response = client.get(release_url).header(header::USER_AGENT, "Nvidia Fanctrl").send().await.unwrap();
 
         let response_text = response.text().await.unwrap();
 
@@ -72,12 +89,37 @@ pub fn update_func(binary_name: String, file_path: &Path) {
                 })
             });
 
+        // Find the checksums.json asset
+        let checksums_asset = assets.iter().find(|a| {
+            let name = a["name"].as_str().unwrap_or_default();
+            name == "checksums.json"
+        });
+
+        let mut checksums: Vec<Checksum> = Vec::new();
+        if let Some(asset) = checksums_asset {
+            let checksums_url = asset["browser_download_url"].as_str().unwrap_or_default();
+
+            let response = client.get(checksums_url).header(header::USER_AGENT, "Nvidia Fanctrl").send().await.unwrap();
+
+            // Extract the response body as bytes
+            let response_bytes = response.bytes().await.unwrap();
+            let response_str = std::str::from_utf8(&response_bytes).unwrap(); // Convert bytes to UTF-8 string
+
+            // Parse checksums.json as JSON
+            let checksums_json: serde_json::Value = serde_json::from_str(&response_str).unwrap();
+
+            if let Some(object) = checksums_json.as_object() {
+                for (key, value) in object {
+                    let checksum = Checksum { key: key.clone(), value: value.to_string() };
+                    checksums.push(checksum);
+                }
+            }
+        }
+
         if let Some(asset) = asset {
             let download_url = asset["browser_download_url"].as_str().unwrap();
-            if let Err(e) = std::fs::remove_file(file_path) {
-                eprintln!("Failed to delete old file: {}", e);
-            }
-            let mut file = File::create(file_path).expect("Failed to create file");
+
+            let mut file = File::create(&file_path_tmp).expect("Failed to create file");
 
             let mut response = client.get(download_url).send().await.unwrap();
             let content_length = response.content_length().unwrap();
@@ -95,5 +137,8 @@ pub fn update_func(binary_name: String, file_path: &Path) {
             let permissions = Permissions::from_mode(0o755); // Sets the permission to rwxr-xr-x
             file.set_permissions(permissions).unwrap();
         }
+
+        return checksums;
     });
+    checksums_result
 }

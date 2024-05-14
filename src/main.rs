@@ -1,5 +1,6 @@
+use std::fs::{metadata, remove_file};
 use std::path::Path;
-use std::process::{self, exit, Command};
+use std::process::{exit, Command};
 use std::sync::mpsc;
 use std::time::Duration;
 use std::{env, thread};
@@ -17,24 +18,59 @@ use calculations::*;
 mod colour_math;
 use colour_math::rgb_temp;
 
+mod checksum_func;
+use checksum_func::compute_file_sha256;
+
 // Defines interval to refresh screen and screen boundries calculations
 const REFRESH_TIME: u8 = 5;
 
 //  ╔═══════════════════════════════════════════════════════════════════╗
 //  ║   Define build flags for quick compilation of different fan_args  ║
 //  ╠═══════════════════════════════════════════════════════════════════╣
-#[cfg(feature = "fan_amount_2")] //                                     ║
-const FAN_AMOUNT: u8 = 2; //                                            ║
-                          //                                            ║
-#[cfg(feature = "fan_amount_3")] //                                     ║
-const FAN_AMOUNT: u8 = 3; //                                            ║
-                          //                                            ║
-#[cfg(feature = "fan_amount_4")] //                                     ║
-const FAN_AMOUNT: u8 = 4; //                                            ║
+#[cfg(feature = "fan_amount_2")]
+const FAN_AMOUNT: u8 = 2;
+#[cfg(feature = "fan_amount_2")]
+const CAPITALIZED_BINARY_NAME: &str = {
+    if cfg!(target_feature = "crt-static") {
+        "Rust-gpu-fan-control-2-fans-static"
+    } else {
+        "Rust-gpu-fan-control-2-fans"
+    }
+};
+
+#[cfg(feature = "fan_amount_3")]
+const FAN_AMOUNT: u8 = 3;
+#[cfg(feature = "fan_amount_3")]
+const CAPITALIZED_BINARY_NAME: &str = {
+    if cfg!(target_feature = "crt-static") {
+        "Rust-gpu-fan-control-3-fans-static"
+    } else {
+        "Rust-gpu-fan-control-3-fans"
+    }
+};
+
+#[cfg(feature = "fan_amount_4")]
+const FAN_AMOUNT: u8 = 4;
+#[cfg(feature = "fan_amount_4")]
+const CAPITALIZED_BINARY_NAME: &str = {
+    if cfg!(target_feature = "crt-static") {
+        "Rust-gpu-fan-control-4-fans-static"
+    } else {
+        "Rust-gpu-fan-control-4-fans"
+    }
+};
 
 // Input your gpu fan amount here
 #[cfg(not(any(feature = "fan_amount_2", feature = "fan_amount_3", feature = "fan_amount_4")))]
 const FAN_AMOUNT: u8 = 1; // Default value when none of the other build options are specified
+#[cfg(not(any(feature = "fan_amount_2", feature = "fan_amount_3", feature = "fan_amount_4")))]
+const CAPITALIZED_BINARY_NAME: &str = {
+    if cfg!(target_feature = "crt-static") {
+        "Rust-gpu-fan-control-static"
+    } else {
+        "Rust-gpu-fan-control"
+    }
+};
 
 // Input your gpu number here (if you have 1 gpu its normally nought so just leave it)
 pub const GPU_NUMBER: u8 = 0;
@@ -92,6 +128,44 @@ fn sleep(input_sec: u8) {
     thread::sleep(Duration::from_secs(input_sec.into()));
 }
 
+// Get path of the current binary at runtime
+fn get_binary_path() -> String {
+    let binary_path = if let Ok(path) = env::current_exe() {
+        if let Some(file_name) = path.file_name() {
+            if let Some(name) = file_name.to_str() {
+                name.to_string()
+            } else {
+                println!("Can't find binary_path exiting make a issue on github");
+                exit(0);
+            }
+        } else {
+            println!("Can't find binary_path (path.file_name) exiting make a issue on github");
+            exit(0);
+        }
+    } else {
+        println!("Can't find binary_path (env::current_exe()) exiting make a issue on github");
+        exit(0);
+    };
+    binary_path
+}
+
+fn get_current_exe_dir() -> String {
+    let current_exe_dir = match env::current_exe() {
+        Ok(path) => {
+            if let Some(parent_dir) = path.parent() {
+                parent_dir.to_string_lossy().into_owned()
+            } else {
+                panic!("Failed to obtain parent directory of the current executable.");
+            }
+        }
+        Err(e) => {
+            eprintln!("Error get_current_exe_dir: {}", e);
+            exit(1);
+        }
+    };
+    current_exe_dir
+}
+
 fn main() {
     check_sudo();
     // Added if statement here for later amd gpu intergration
@@ -142,38 +216,6 @@ fn main() {
         .arg(Arg::new("fahrenheit-id").short('f').long("fahrenheit").help("Use fahrenheit instead of celsius").action(ArgAction::SetTrue))
         .get_matches();
     {
-        // Get path of the current binary at runtime
-        let binary_path = if let Ok(path) = env::current_exe() {
-            if let Some(file_name) = path.file_name() {
-                if let Some(name) = file_name.to_str() {
-                    name.to_string()
-                } else {
-                    println!("Can't find binary_path exiting make a issue on github");
-                    exit(0);
-                }
-            } else {
-                println!("Can't find binary_path (path.file_name) exiting make a issue on github");
-                exit(0);
-            }
-        } else {
-            println!("Can't find binary_path (env::current_exe()) exiting make a issue on github");
-            exit(0);
-        };
-
-        let current_exe_dir = match env::current_exe() {
-            Ok(path) => {
-                if let Some(parent_dir) = path.parent() {
-                    parent_dir.to_string_lossy().into_owned()
-                } else {
-                    panic!("Failed to obtain parent directory of the current executable.");
-                }
-            }
-            Err(e) => {
-                eprintln!("Error: {}", e);
-                return;
-            }
-        };
-
         // Standard update check on boot up prints a message if there is a newer version
         if !args.get_flag("skip-update-check") && !args.get_flag("update-now") {
             let checking_repo_version = is_current_version_older("https://github.com/UnknownSuperficialNight/nvidia-fan-control", VERSION);
@@ -182,6 +224,7 @@ fn main() {
                 _ => (false, String::from("0.0.0")), // Default values in case of an error
             };
             if is_older {
+                let binary_path = get_binary_path();
                 println!("Current Version: \"{VERSION}\" is behind repo: \"{}\"", repo_version);
                 println!("Please update to the new version using \"sudo ./{} -u\"", binary_path);
                 println!("Resuming normal operation in 10 seconds");
@@ -192,10 +235,53 @@ fn main() {
         // Update to the new version on git i.e (Remove current binary download a new replacement binary in
         // its place)
         if args.get_flag("update-now") {
-            let binary_name_capitalized = format!("{}{}", &binary_path[..1].to_uppercase(), &binary_path[1..]);
-            let current_exe_dir_path = &format!("{}/{}", current_exe_dir, binary_path);
+            let checking_repo_version = is_current_version_older("https://github.com/UnknownSuperficialNight/nvidia-fan-control", VERSION);
+            let repo_version = match checking_repo_version {
+                Ok((_, version)) => version,
+                Err(_) => String::from("0.0.0"), // Default value in case of an error
+            };
 
-            update_func(binary_name_capitalized, Path::new(current_exe_dir_path));
+            let binary_path = get_binary_path();
+            let current_exe_dir = get_current_exe_dir();
+            let current_exe_dir_path = &format!("{}/{}", current_exe_dir, binary_path);
+            let file_path_tmp = &format!("{}-dl_tmp", current_exe_dir_path);
+
+            let checksums_vec = update_func(CAPITALIZED_BINARY_NAME, Path::new(file_path_tmp));
+
+            let mut repo_bin_sha256_result: String = "Error".to_string();
+            for checksum in &checksums_vec {
+                if checksum.key == CAPITALIZED_BINARY_NAME {
+                    repo_bin_sha256_result = checksum.value.clone();
+                }
+            }
+
+            // Get a sha256sum of the updated binary
+            let updated_bin_sha256 = compute_file_sha256(current_exe_dir_path);
+            let updated_bin_sha256_result = match updated_bin_sha256 {
+                Some(hash) => format!("{}", hash),
+                None => "Failed to compute SHA-256 hash of the file.".to_string(),
+            };
+
+            // println!("repo_bin_sha256_result: {}", repo_bin_sha256_result);
+            // println!("updated_bin_sha256: {}", updated_bin_sha256_result);
+
+            if repo_bin_sha256_result == updated_bin_sha256_result {
+                update_func_commit(Path::new(current_exe_dir_path), Path::new(file_path_tmp));
+                println!("Checksums Match the repositorys.");
+            } else {
+                println!("{}", "Issue during download process checksums do not match the repositorys.".red());
+                if metadata(&file_path_tmp).is_ok() {
+                    if let Err(err) = remove_file(&file_path_tmp) {
+                        eprintln!("Error: {}", err);
+                    } else {
+                        println!("Tmp_file '{}' successfully deleted", file_path_tmp);
+                    }
+                } else {
+                    println!("File '{}' does not exist", file_path_tmp);
+                }
+            }
+
+            println!("Downloaded version: {}", repo_version);
             exit(0);
         }
 

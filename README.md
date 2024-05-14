@@ -55,7 +55,7 @@ Edit `./src/main.rs` inside find a variable you would like to change options bel
 - SPEED
 
 ### REFRESH_TIME:
-REFRESH_TIME is how responsive the terminal is to resizing and the speed at which it will update the gui
+REFRESH_TIME is how responsive the terminal is to resizing and the speed at which it will update the tui
 
 ### FAN_AMOUNT:
 FAN_AMOUNT is the amount of fans on your gpu you wish to target
