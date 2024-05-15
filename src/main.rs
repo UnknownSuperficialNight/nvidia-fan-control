@@ -259,7 +259,7 @@ fn main() {
             // Get a sha256sum of the updated binary
             let updated_bin_sha256 = compute_file_sha256(file_path_tmp);
             let updated_bin_sha256_result = match updated_bin_sha256 {
-                Some(hash) => format!("{}", hash),
+                Some(hash) => hash.to_string(),
                 None => "Failed to compute SHA-256 hash of the file.".to_string(),
             };
 
@@ -271,8 +271,8 @@ fn main() {
                 println!("Checksums Match the repositorys.");
             } else {
                 println!("{}", "Issue during download process checksums do not match the repositorys.".red());
-                if metadata(&file_path_tmp).is_ok() {
-                    if let Err(err) = remove_file(&file_path_tmp) {
+                if metadata(file_path_tmp).is_ok() {
+                    if let Err(err) = remove_file(file_path_tmp) {
                         eprintln!("Error: {}", err);
                     } else {
                         println!("Tmp_file '{}' successfully deleted", file_path_tmp);
@@ -327,14 +327,14 @@ fn main() {
     let mut skip_changed_center: usize = 0;
     let mut vertical_center: usize = 0;
     loop {
-        let temp: u8;
         // Added if statement here for later amd gpu intergration
+        let temp: u8;
         if gpu_manufacturer == 0 {
-            temp = get_current_nvidia_temp();
+            temp = get_current_nvidia_temp()
         } else {
             eprintln!("Error: Unknown GPU or no GPU found");
             exit(1);
-        }
+        };
         let speed_output = diff_func(temp);
         if args.get_flag("no-tui") {
             if speed_output != Into::<u8>::into(temp_capture_call) {
@@ -352,12 +352,7 @@ fn main() {
         } else {
             let rgb_value_temp = rgb_temp(temp);
             let rgb_value_speed_output = rgb_temp(speed_output);
-            let gpu_temp_str: String;
-            if args.get_flag("fahrenheit-id") {
-                gpu_temp_str = format!("gpu temp: {}°F", celcius_to_fahrenheit(temp));
-            } else {
-                gpu_temp_str = format!("gpu temp: {}°C", temp);
-            };
+            let gpu_temp_str: String = if args.get_flag("fahrenheit-id") { format!("gpu temp: {}°F", celcius_to_fahrenheit(temp)) } else { format!("gpu temp: {}°C", temp) };
             let fan_speed_output_str = format!("Current fan speed: {}%", speed_output);
             let skip = format!("Skipped execution as speed has not changed from {}", speed_output);
             let skip_changed = format!("Changed Speed to {}", speed_output);

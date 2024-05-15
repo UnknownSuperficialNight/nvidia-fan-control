@@ -118,7 +118,7 @@ pub fn update_func(binary_name: &str, file_path_tmp: &Path) -> Vec<Checksum> {
         if let Some(asset) = asset {
             let download_url = asset["browser_download_url"].as_str().unwrap();
 
-            let mut file = File::create(&file_path_tmp).expect("Failed to create file");
+            let mut file = File::create(file_path_tmp).expect("Failed to create file");
 
             let mut response = client.get(download_url).send().await.unwrap();
             let content_length = response.content_length().unwrap();
@@ -137,7 +137,7 @@ pub fn update_func(binary_name: &str, file_path_tmp: &Path) -> Vec<Checksum> {
             file.set_permissions(permissions).unwrap();
         }
 
-        return checksums;
+        checksums
     });
     checksums_result
 }
