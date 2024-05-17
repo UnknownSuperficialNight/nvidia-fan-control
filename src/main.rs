@@ -258,15 +258,8 @@ fn main() {
 
             // Get a sha256sum of the updated binary
             let updated_bin_sha256 = compute_file_sha256(file_path_tmp);
-            let updated_bin_sha256_result = match updated_bin_sha256 {
-                Some(hash) => hash.to_string(),
-                None => "Failed to compute SHA-256 hash of the file.".to_string(),
-            };
 
-            // println!("repo_bin_sha256_result: {}", repo_bin_sha256_result);
-            // println!("updated_bin_sha256: {}", updated_bin_sha256_result);
-
-            if repo_bin_sha256_result == updated_bin_sha256_result {
+            if repo_bin_sha256_result == updated_bin_sha256 {
                 update_func_commit(Path::new(current_exe_dir_path), Path::new(file_path_tmp));
                 println!("Checksums Match the repositorys.");
             } else {
@@ -330,11 +323,11 @@ fn main() {
         // Added if statement here for later amd gpu intergration
         let temp: u8;
         if gpu_manufacturer == 0 {
-            temp = get_current_nvidia_temp()
+            temp = get_current_nvidia_temp();
         } else {
             eprintln!("Error: Unknown GPU or no GPU found");
             exit(1);
-        };
+        }
         let speed_output = diff_func(temp);
         if args.get_flag("no-tui") {
             if speed_output != Into::<u8>::into(temp_capture_call) {

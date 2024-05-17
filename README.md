@@ -12,6 +12,10 @@ The `nvidia-fan-control` utility is a user-friendly tool designed for controllin
 - **Proprietary Driver Support**: Tailored for the NVIDIA proprietary driver.
 - **Open Source Driver**: Compatibility with the open-source `nouveau` driver has not been tested but could potentially work.
 
+### Features in the working
+- **AMD GPU Support**: Expanding the utility to include compatibility with AMD GPUs
+- **Logging and Monitoring**: Implement logging to track temperatures and fan speeds over time for performance insights.
+
 ### Usage Instructions
 To start the automatic fan control:
 
