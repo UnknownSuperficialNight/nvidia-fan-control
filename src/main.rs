@@ -16,7 +16,7 @@ mod calculations;
 use calculations::*;
 
 mod colour_math;
-use colour_math::rgb_temp;
+use colour_math::{rgb_temp, RgbColor};
 
 mod checksum_func;
 use checksum_func::compute_file_sha256;
@@ -319,6 +319,7 @@ fn main() {
     let mut skip_center: usize = 0;
     let mut skip_changed_center: usize = 0;
     let mut vertical_center: usize = 0;
+    let rgb_array: RgbColor = RgbColor::new();
     loop {
         // Added if statement here for later amd gpu intergration
         let temp: u8;
@@ -343,8 +344,8 @@ fn main() {
             }
             temp_capture_call = speed_output;
         } else {
-            let rgb_value_temp = rgb_temp(temp);
-            let rgb_value_speed_output = rgb_temp(speed_output);
+            let rgb_value_temp = rgb_temp(&rgb_array, temp);
+            let rgb_value_speed_output = rgb_temp(&rgb_array, speed_output);
             let gpu_temp_str: String = if args.get_flag("fahrenheit-id") { format!("gpu temp: {}°F", celcius_to_fahrenheit(temp)) } else { format!("gpu temp: {}°C", temp) };
             let fan_speed_output_str = format!("Current fan speed: {}%", speed_output);
             let skip = format!("Skipped execution as speed has not changed from {}", speed_output);

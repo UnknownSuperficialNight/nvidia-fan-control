@@ -1,39 +1,96 @@
 // Determine the RGB value based on the temperature
-// Yes this is bad code its a stand in until i get the gradient mathematics worked out
-pub fn rgb_temp(temp: u8) -> (u8, u8, u8) {
-    let blue = match temp {
-        0..=34 => 206 - ((35 - temp) * 4),
-        35..=44 => 206,
-        45..=59 => 206 - ((temp - 45) * 4),
-        60 => 197,
-        61..=69 => 197 + ((temp - 60) * 3),
-        _ => 255,
+pub fn rgb_temp(rgb: &RgbColor, temp: u8) -> (u8, u8, u8) {
+    // Define colour ranges
+    let min_val = 30.0;
+    let max_val = 85.0;
+    let total_gradients = RgbColor::total_colors(&rgb);
+
+    // Return the selected rgb values
+    let returned_temp: Option<(u8, u8, u8)> = if temp <= min_val as u8 {
+        Some(rgb.colors[0])
+    } else if temp >= max_val as u8 {
+        rgb.colors.last().cloned().or_else(|| Some(rgb.colors[0]))
+    } else {
+        let selected_gradient_index = calculate_gradient_index(temp.into(), min_val, max_val, total_gradients.into());
+        RgbColor::get_color_by_index(&rgb, selected_gradient_index, total_gradients)
     };
-    let green = match temp {
-        0..=34 => 64 + (temp * 3),
-        35..=44 => 255,
-        45..=59 => 56,
-        60 => 0,
-        61..=69 => 0,
-        _ => 0,
-    };
-    let red = match temp {
-        0..=34 => 64,
-        35..=44 => 201,
-        45..=59 => 206,
-        60 => 206,
-        61..=69 => 206,
-        _ => 255,
-    };
-    (red, green, blue)
+
+    match returned_temp {
+        Some((r, g, b)) => (r, g, b),
+        None => {
+            // Print the error message to the standard error stream
+            eprintln!("Error: returned_temp is None");
+
+            (0, 0, 0)
+        }
+    }
 }
 
-// Added to be used when adding gradient calculations to convert from a human-readable colour format
-// like CMYK to RGB
-fn cmyk_to_rgb(c: u8, m: u8, y: u8, k: u8) -> (u8, u8, u8) {
-    let r = 255.0 * (1.0 - c as f32 / 100.0) * (1.0 - k as f32 / 100.0);
-    let g = 255.0 * (1.0 - m as f32 / 100.0) * (1.0 - k as f32 / 100.0);
-    let b = 255.0 * (1.0 - y as f32 / 100.0) * (1.0 - k as f32 / 100.0);
+pub struct RgbColor {
+    pub colors: Vec<(u8, u8, u8)>,
+}
 
-    (r.round() as u8, g.round() as u8, b.round() as u8)
+impl RgbColor {
+    pub fn new() -> RgbColor {
+        RgbColor {
+            colors: vec![
+                (0, 255, 175),
+                (0, 255, 215),
+                (0, 255, 255),
+                (0, 215, 255),
+                (0, 175, 255),
+                (0, 135, 255),
+                (0, 95, 255),
+                (0, 0, 255),
+                (0, 0, 215),
+                (0, 0, 175),
+                (0, 0, 135),
+                (95, 0, 135),
+                (95, 0, 175),
+                (95, 0, 215),
+                (95, 0, 255),
+                (135, 0, 255),
+                (135, 0, 215),
+                (135, 0, 175),
+                (135, 0, 135),
+                (135, 0, 95),
+                (135, 0, 0),
+                (175, 0, 0),
+                (215, 0, 0),
+                (255, 0, 0),
+            ],
+        }
+    }
+
+    fn get_color_by_index(&self, index: u8, selected_index: u8) -> Option<(u8, u8, u8)> {
+        if index < selected_index {
+            Some(self.colors[index as usize])
+        } else {
+            None
+        }
+    }
+
+    fn total_colors(&self) -> u8 {
+        self.colors.len() as u8
+    }
+}
+
+// Used to get the selected gradient based on the input mapped to the array
+fn calculate_gradient_index(temp: f32, min_val: f32, max_val: f32, total_gradients: f32) -> u8 {
+    // Ensure temp is within the range
+    if temp < min_val || temp > max_val {
+        eprintln!("Error: Temperature is out of the specified range.");
+        std::process::exit(1);
+    }
+
+    // Adjust temp to start from min_val
+    let adjusted_temp = temp - min_val;
+
+    // Calculate the step size for each gradient
+    let step_size = (max_val - min_val) / (total_gradients - 1.0);
+
+    // Calculate the gradient index
+    let gradient_index = (adjusted_temp - (adjusted_temp % step_size)) / step_size;
+
+    gradient_index as u8
 }

@@ -12,7 +12,7 @@ pub fn compute_file_sha256(file_path: &str) -> String {
         Err(err) => {
             eprintln!("Error opening the file: {}", err);
             exit(1);
-        } // Return None if file opening fails
+        }
     };
 
     // Initialize SHA-256 hasher
