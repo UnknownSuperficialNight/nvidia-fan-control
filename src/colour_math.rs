@@ -17,7 +17,7 @@ pub fn rgb_temp(rgb: &RgbColor, temp: u8) -> (u8, u8, u8) {
 
     match returned_temp {
         Some((r, g, b)) => (r, g, b),
-        None => {
+        _none => {
             // Print the error message to the standard error stream
             eprintln!("Error: returned_temp is None");
 

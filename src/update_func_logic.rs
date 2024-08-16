@@ -5,6 +5,7 @@ use std::path::Path;
 
 use indicatif::{ProgressBar, ProgressStyle};
 use reqwest::header;
+use tokio::runtime::Builder;
 
 #[derive(Debug)]
 pub struct Checksum {
@@ -64,7 +65,13 @@ pub fn update_func_commit(file_path: &Path, file_path_tmp: &Path) {
 }
 
 pub fn update_func(binary_name: &str, file_path_tmp: &Path) -> Vec<Checksum> {
-    let checksums_result = tokio::runtime::Runtime::new().unwrap().block_on(async {
+    let runtime = Builder::new_current_thread()
+        .thread_name("update_func_runtime")
+        .enable_all() // Enable all features (like timeouts, blocking, etc.)
+        .build()
+        .unwrap();
+
+    let checksums_result = runtime.block_on(async {
         let release_url = "https://api.github.com/repos/UnknownSuperficialNight/nvidia-fan-control/releases/latest";
 
         let client = reqwest::Client::new();

@@ -1,18 +1,18 @@
 [package]
 name = "rust-gpu-fan-control"
-version = "0.0.8"
+version = "0.0.9"
 edition = "2021"
 
 [dependencies]
-termion = "4.0.0"
-ctrlc = "3.4.4"
+termion = "4.0.2"
+ctrlc = "3.4.5"
 owo-colors = "4.0.0"
-clap = { version = "4.5.4", features = ["std", "cargo", "help", "usage"], default-features = false }
-reqwest = { version = "0.12.4", default-features = false, features = ["blocking", "rustls-tls"] }
-serde_json = "1.0.116"
-tokio = { version = "1.37.0", features = [], default-features = false }
+clap = { version = "4.5.16", features = ["std", "cargo", "help", "usage"], default-features = false }
+reqwest = { version = "0.12.5", default-features = false, features = ["blocking", "rustls-tls"] }
+serde_json = "1.0.125"
+tokio = { version = "1.39.2", features = [], default-features = false }
 indicatif = { default-features = false, version = "0.17.8" }
-sha2 = "0.11.0-pre.3"
+sha2 = "0.10.8"
 
 [features]
 fan_amount_2 = []

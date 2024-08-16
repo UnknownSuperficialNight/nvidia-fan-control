@@ -12,14 +12,11 @@ The `nvidia-fan-control` utility is a user-friendly tool designed for controllin
 - **Proprietary Driver Support**: Tailored for the NVIDIA proprietary driver.
 - **Open Source Driver**: Compatibility with the open-source `nouveau` driver has not been tested but could potentially work.
 
-### Features in the working
-- **AMD GPU Support**: Expanding the utility to include compatibility with AMD GPUs
-- **Logging and Monitoring**: Implement logging to track temperatures and fan speeds over time for performance insights.
-
 ### Usage Instructions
 To start the automatic fan control:
 
 ```bash
+chmod +x Rust-gpu-fan-control # used for allowing execution permissions
 sudo ./Rust-gpu-fan-control
 ```
 If you need help with flags just type `sudo ./Rust-gpu-fan-control --help`
@@ -29,6 +26,7 @@ If you need help with flags just type `sudo ./Rust-gpu-fan-control --help`
 For the Bash version, use these commands:
 ```Bash
 wget 'https://github.com/UnknownSuperficialNight/nvidia-fan-control/raw/main/Bash_version/nvidia-fan-ctrl.sh'
+chmod +x nvidia-fan-ctrl.sh # used for allowing execution permissions
 sudo ./nvidia-fan-ctrl.sh
 ```
 
@@ -89,3 +87,5 @@ The speed array in both versions is used to customize the speed. It will by defa
 Thus, change the array how you see fit to make it work for you. I've set it up to work for my GPU as mine can only be at 59 speed at minimum.
 
 Also, you can change the code. Currently, I have it set so that if the temp is greater than `80°C`, then it adds 20 to the speed_output variable, thus making the fan speed `100%`. It also ensures the fan speed does not go over 100%.
+
+Thus, if you want to remove or change it, going to 100% once it hits 80°C, then the code is at this [Line](https://github.com/UnknownSuperficialNight/nvidia-fan-control/blob/main/src/calculations.rs#L17)
