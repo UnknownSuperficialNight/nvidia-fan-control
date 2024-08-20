@@ -1,18 +1,24 @@
 // Determine the RGB value based on the temperature
 pub fn rgb_temp(rgb: &RgbColor, temp: u8) -> (u8, u8, u8) {
+    // Call the main calculate function with predetermined range
+    rgb_temp_f32(30.0, 85.0, rgb, temp as f32)
+}
+
+// Determine the RGB value based on the temperature
+pub fn rgb_temp_f32(min: f32, max: f32, rgb: &RgbColor, temp: f32) -> (u8, u8, u8) {
     // Define colour ranges
-    let min_val = 30.0;
-    let max_val = 85.0;
-    let total_gradients = RgbColor::total_colors(&rgb);
+    let min_val = min;
+    let max_val = max;
+    let total_gradients = RgbColor::total_colors(rgb);
 
     // Return the selected rgb values
-    let returned_temp: Option<(u8, u8, u8)> = if temp <= min_val as u8 {
+    let returned_temp: Option<(u8, u8, u8)> = if temp <= min_val {
         Some(rgb.colors[0])
-    } else if temp >= max_val as u8 {
+    } else if temp >= max_val {
         rgb.colors.last().cloned().or_else(|| Some(rgb.colors[0]))
     } else {
-        let selected_gradient_index = calculate_gradient_index(temp.into(), min_val, max_val, total_gradients.into());
-        RgbColor::get_color_by_index(&rgb, selected_gradient_index, total_gradients)
+        let selected_gradient_index = calculate_gradient_index(temp, min_val, max_val, total_gradients.into());
+        RgbColor::get_color_by_index(rgb, selected_gradient_index, total_gradients)
     };
 
     match returned_temp {

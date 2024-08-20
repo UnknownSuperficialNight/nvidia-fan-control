@@ -12,6 +12,9 @@ The `nvidia-fan-control` utility is a user-friendly tool designed for controllin
 - **Proprietary Driver Support**: Tailored for the NVIDIA proprietary driver.
 - **Open Source Driver**: Compatibility with the open-source `nouveau` driver has not been tested but could potentially work.
 
+### AMDGPU
+- **Monitoring support for amdgpu**: Tested on (RDNA3/RDNA2)
+
 ### Usage Instructions
 To start the automatic fan control:
 
@@ -51,13 +54,13 @@ cd nvidia-fan-control
 ```
 
 Edit `./src/main.rs` inside find a variable you would like to change options below:
-- REFRESH_TIME
-- FAN_AMOUNT
-- GPU_NUMBER
-- SPEED
+- [REFRESH_TIME](https://github.com/UnknownSuperficialNight/nvidia-fan-control/blob/main/src/main.rs#L31)
+- [FAN_AMOUNT](https://github.com/UnknownSuperficialNight/nvidia-fan-control/blob/main/src/compile_flag_helper.rs)
+- [GPU_NUMBER](https://github.com/UnknownSuperficialNight/nvidia-fan-control/blob/main/src/main.rs#L43)
+- [SPEED](https://github.com/UnknownSuperficialNight/nvidia-fan-control/blob/main/src/main.rs#L47)
 
 ### REFRESH_TIME:
-REFRESH_TIME is how responsive the terminal is to resizing and the speed at which it will update the tui
+REFRESH_TIME is how responsive the terminal is to resizing and the speed at which it will update the tui:
 
 ### FAN_AMOUNT:
 FAN_AMOUNT is the amount of fans on your gpu you wish to target

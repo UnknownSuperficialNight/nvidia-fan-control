@@ -16,61 +16,28 @@ mod calculations;
 use calculations::*;
 
 mod colour_math;
-use colour_math::{rgb_temp, RgbColor};
+use colour_math::{rgb_temp, rgb_temp_f32, RgbColor};
 
 mod checksum_func;
 use checksum_func::compute_file_sha256;
 
+mod amdgpu;
+use amdgpu::get_amdgpu;
+
+mod compile_flag_helper;
+use compile_flag_helper::{CAPITALIZED_BINARY_NAME, FAN_AMOUNT};
+
 // Defines interval to refresh screen and screen boundries calculations
-const REFRESH_TIME: u8 = 5;
-
-//  ╔═══════════════════════════════════════════════════════════════════╗
-//  ║   Define build flags for quick compilation of different fan_args  ║
-//  ╠═══════════════════════════════════════════════════════════════════╣
-#[cfg(feature = "fan_amount_2")]
-const FAN_AMOUNT: u8 = 2;
-#[cfg(feature = "fan_amount_2")]
-const CAPITALIZED_BINARY_NAME: &str = {
-    if cfg!(target_feature = "crt-static") {
-        "Rust-gpu-fan-control-2-fans-static"
+fn define_refresh_time(gpu_manufacturer: u8) -> f32 {
+    if gpu_manufacturer == 0 {
+        5.0 // Refresh rate on nvidia gpu here format in seconds
+    } else if gpu_manufacturer == 1 {
+        0.1 // Refresh rate on amdgpu here format in seconds
     } else {
-        "Rust-gpu-fan-control-2-fans"
+        eprintln!("Error: Unknown GPU or no GPU found");
+        exit(1)
     }
-};
-
-#[cfg(feature = "fan_amount_3")]
-const FAN_AMOUNT: u8 = 3;
-#[cfg(feature = "fan_amount_3")]
-const CAPITALIZED_BINARY_NAME: &str = {
-    if cfg!(target_feature = "crt-static") {
-        "Rust-gpu-fan-control-3-fans-static"
-    } else {
-        "Rust-gpu-fan-control-3-fans"
-    }
-};
-
-#[cfg(feature = "fan_amount_4")]
-const FAN_AMOUNT: u8 = 4;
-#[cfg(feature = "fan_amount_4")]
-const CAPITALIZED_BINARY_NAME: &str = {
-    if cfg!(target_feature = "crt-static") {
-        "Rust-gpu-fan-control-4-fans-static"
-    } else {
-        "Rust-gpu-fan-control-4-fans"
-    }
-};
-
-// Input your gpu fan amount here
-#[cfg(not(any(feature = "fan_amount_2", feature = "fan_amount_3", feature = "fan_amount_4")))]
-const FAN_AMOUNT: u8 = 1; // Default value when none of the other build options are specified
-#[cfg(not(any(feature = "fan_amount_2", feature = "fan_amount_3", feature = "fan_amount_4")))]
-const CAPITALIZED_BINARY_NAME: &str = {
-    if cfg!(target_feature = "crt-static") {
-        "Rust-gpu-fan-control-static"
-    } else {
-        "Rust-gpu-fan-control"
-    }
-};
+}
 
 // Input your gpu number here (if you have 1 gpu its normally nought so just leave it)
 pub const GPU_NUMBER: u8 = 0;
@@ -111,7 +78,7 @@ fn find_gpu_manufacturer() -> u8 {
     let output_str = String::from_utf8_lossy(&output.stdout);
     if output_str.contains("NVIDIA") {
         0
-    } else if output_str.contains("AMD") {
+    } else if output_str.contains("amdgpu") {
         1
     } else {
         255
@@ -124,8 +91,8 @@ fn celcius_to_fahrenheit(input_celcius: u8) -> u8 {
 }
 
 // Sleep calling thread for x seconds
-fn sleep(input_sec: u8) {
-    thread::sleep(Duration::from_secs(input_sec.into()));
+fn sleep(input_sec: f32) {
+    thread::sleep(Duration::from_secs_f32(input_sec));
 }
 
 // Get path of the current binary at runtime
@@ -168,8 +135,11 @@ fn get_current_exe_dir() -> String {
 
 fn main() {
     check_sudo();
+
     // Added if statement here for later amd gpu intergration
     let gpu_manufacturer = find_gpu_manufacturer();
+
+    let refresh_time = define_refresh_time(gpu_manufacturer);
 
     // If find_gpu_manufacturer can't find a supported gpu exit the program
     if gpu_manufacturer == 255 {
@@ -196,6 +166,8 @@ fn main() {
         if gpu_manufacturer == 0 {
             // Execute the cleanup function for nvidia
             cleanup_nvidia();
+        } else if gpu_manufacturer == 1 {
+            print!("\x1B[?25h");
         } else {
             eprintln!("Error: Unknown GPU or no GPU found");
             exit(1);
@@ -228,7 +200,7 @@ fn main() {
                 println!("Current Version: \"{VERSION}\" is behind repo: \"{}\"", repo_version);
                 println!("Please update to the new version using \"sudo ./{} -u\"", binary_path);
                 println!("Resuming normal operation in 10 seconds");
-                sleep(10);
+                sleep(10.0);
             }
         }
 
@@ -301,7 +273,7 @@ fn main() {
             // Wait and prompt the user to press Ctrl+C to exit
             println!("Press Ctrl+C to exit");
             loop {
-                sleep(1);
+                sleep(1.0);
             }
         }
     }
@@ -319,12 +291,81 @@ fn main() {
     let mut skip_center: usize = 0;
     let mut skip_changed_center: usize = 0;
     let mut vertical_center: usize = 0;
+
+    // Define amd specific variables
+    let mut amd_current_rpm: f32 = 0.0;
+    let mut amd_fan_speed_percentage: u8 = 0;
+    let mut amd_junction_temp: f32 = 0.0;
+    let mut amd_memory_temp: f32 = 0.0;
+    let mut amd_min_temp: f32 = 0.0;
+    let mut amd_max_temp: f32 = 0.0;
+
     let rgb_array: RgbColor = RgbColor::new();
     loop {
-        // Added if statement here for later amd gpu intergration
         let temp: u8;
+
+        // Define amd specific variables
         if gpu_manufacturer == 0 {
             temp = get_current_nvidia_temp();
+        } else if gpu_manufacturer == 1 {
+            // Define amd specific variables
+            let amdgpu_info = get_amdgpu().unwrap();
+
+            amd_current_rpm = amdgpu_info.get("Current RPM").map_or_else(
+                || {
+                    println!("Error getting Current RPM info for amd");
+                    exit(1);
+                },
+                |&value| value,
+            );
+
+            amd_fan_speed_percentage = amdgpu_info.get("Fan Speed Percentage").map_or_else(
+                || {
+                    println!("Error getting Fan Speed Percentage info for amd");
+                    exit(1);
+                },
+                |&value| value as u8,
+            );
+
+            temp = amdgpu_info.get("Edge Temp").map_or_else(
+                || {
+                    println!("Error getting temp info for amd");
+                    exit(1);
+                },
+                |&value| value as u8,
+            );
+
+            amd_junction_temp = amdgpu_info.get("Junction Temp").map_or_else(
+                || {
+                    println!("Error getting Junction Temp info for amd");
+                    exit(1);
+                },
+                |&value| value,
+            );
+
+            amd_memory_temp = amdgpu_info.get("Memory Temp").map_or_else(
+                || {
+                    println!("Error getting Memory Temp info for amd");
+                    exit(1);
+                },
+                |&value| value,
+            );
+
+            amd_min_temp = amdgpu_info.get("Min RPM").map_or_else(
+                || {
+                    println!("Error getting Min RPM info for amd");
+                    exit(1);
+                },
+                |&value| value,
+            );
+
+            amd_max_temp = amdgpu_info.get("Max RPM").map_or_else(
+                || {
+                    println!("Error getting Max RPM info for amd");
+                    exit(1);
+                },
+                |&value| value,
+            );
         } else {
             eprintln!("Error: Unknown GPU or no GPU found");
             exit(1);
@@ -346,7 +387,7 @@ fn main() {
         } else {
             let rgb_value_temp = rgb_temp(&rgb_array, temp);
             let rgb_value_speed_output = rgb_temp(&rgb_array, speed_output);
-            let gpu_temp_str: String = if args.get_flag("fahrenheit-id") { format!("gpu temp: {}°F", celcius_to_fahrenheit(temp)) } else { format!("gpu temp: {}°C", temp) };
+            let gpu_temp_str: String = if args.get_flag("fahrenheit-id") { format!("Gpu temp: {}°F", celcius_to_fahrenheit(temp)) } else { format!("Gpu temp: {}°C", temp) };
             let fan_speed_output_str = format!("Current fan speed: {}%", speed_output);
             let skip = format!("Skipped execution as speed has not changed from {}", speed_output);
             let skip_changed = format!("Changed Speed to {}", speed_output);
@@ -390,12 +431,62 @@ fn main() {
 
                 // Print the formatted output at the calculated center positions
                 println!("{: >width$}", gpu_temp_str.truecolor(rgb_value_temp.0, rgb_value_temp.1, rgb_value_temp.2), width = temp_center + gpu_temp_str.len());
-                println!(
-                    "{: >width$}",
-                    fan_speed_output_str.truecolor(rgb_value_speed_output.0, rgb_value_speed_output.1, rgb_value_speed_output.2),
-                    width = speed_output_center + fan_speed_output_str.len()
-                );
 
+                if gpu_manufacturer == 1 {
+                    // Calculate junction pos
+                    let amd_junction_temp_colour = rgb_temp_f32(50.0, 95.0, &rgb_array, amd_junction_temp);
+                    let amd_junction_temp_str: String = if args.get_flag("fahrenheit-id") {
+                        format!("Junction/hotspot: {}°F", celcius_to_fahrenheit(amd_junction_temp as u8))
+                    } else {
+                        format!("Junction/hotspot: {}°C", amd_junction_temp)
+                    };
+                    let amd_junction_temp_center = (width - amd_junction_temp_str.len()) / 2;
+                    println!(
+                        "{: >width$}",
+                        amd_junction_temp_str.truecolor(amd_junction_temp_colour.0, amd_junction_temp_colour.1, amd_junction_temp_colour.2),
+                        width = amd_junction_temp_center + amd_junction_temp_str.len()
+                    );
+
+                    // Calculate Vram/Memory pos
+                    let amd_memory_temp_colour = rgb_temp_f32(60.0, 90.0, &rgb_array, amd_memory_temp);
+                    let amd_memory_temp_str: String = if args.get_flag("fahrenheit-id") {
+                        format!("Memory/vram temp: {}°F", celcius_to_fahrenheit(amd_memory_temp as u8))
+                    } else {
+                        format!("Memory/vram temp: {}°C", amd_memory_temp)
+                    };
+                    let amd_memory_temp_center = (width - amd_memory_temp_str.len()) / 2;
+                    println!(
+                        "{: >width$}",
+                        amd_memory_temp_str.truecolor(amd_memory_temp_colour.0, amd_memory_temp_colour.1, amd_memory_temp_colour.2),
+                        width = amd_memory_temp_center + amd_memory_temp_str.len()
+                    );
+
+                    // Calculate rpm pos
+                    let amd_current_rpm_colour = rgb_temp_f32(amd_min_temp, amd_max_temp, &rgb_array, amd_current_rpm);
+                    let amd_current_rpm_str: String = format!("Current fan RPM: {}", amd_current_rpm);
+                    let amd_current_rpm_center = (width - amd_current_rpm_str.len()) / 2;
+                    println!(
+                        "{: >width$}",
+                        amd_current_rpm_str.truecolor(amd_current_rpm_colour.0, amd_current_rpm_colour.1, amd_current_rpm_colour.2),
+                        width = amd_current_rpm_center + amd_current_rpm_str.len()
+                    );
+
+                    // Calculate fanspeed pos
+                    let amd_fan_speed_percentage_colour = rgb_temp(&rgb_array, amd_fan_speed_percentage);
+                    let amd_fan_speed_percentage_str: String = format!("Current fan speed: {}%", amd_fan_speed_percentage);
+                    let amd_fan_speed_percentage_center = (width - amd_fan_speed_percentage_str.len()) / 2;
+                    println!(
+                        "{: >width$}",
+                        amd_fan_speed_percentage_str.truecolor(amd_fan_speed_percentage_colour.0, amd_fan_speed_percentage_colour.1, amd_fan_speed_percentage_colour.2),
+                        width = amd_fan_speed_percentage_center + amd_fan_speed_percentage_str.len()
+                    );
+                } else {
+                    println!(
+                        "{: >width$}",
+                        fan_speed_output_str.truecolor(rgb_value_speed_output.0, rgb_value_speed_output.1, rgb_value_speed_output.2),
+                        width = speed_output_center + fan_speed_output_str.len()
+                    );
+                }
                 // Added if statement here for later amd gpu intergration
                 if gpu_manufacturer == 0 {
                     if speed_output == Into::<u8>::into(temp_capture_call) {
@@ -415,12 +506,14 @@ fn main() {
                         }
                     }
                     temp_capture_call = speed_output;
+                } else if gpu_manufacturer == 1 {
+                    // TODO: Here for possible fan setting
                 } else {
                     eprintln!("Error: Unknown GPU or no GPU found");
                     exit(1);
                 }
             }
         }
-        sleep(REFRESH_TIME);
+        sleep(refresh_time);
     }
 }
