@@ -304,11 +304,10 @@ fn main() {
     loop {
         let temp: u8;
 
-        // Define amd specific variables
+        // Get info depending on gpu
         if gpu_manufacturer == 0 {
             temp = get_current_nvidia_temp();
         } else if gpu_manufacturer == 1 {
-            // Define amd specific variables
             let amdgpu_info = get_amdgpu().unwrap();
 
             amd_current_rpm = amdgpu_info.get("Current RPM").map_or_else(
