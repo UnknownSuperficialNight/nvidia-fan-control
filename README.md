@@ -89,6 +89,6 @@ The speed array in both versions is used to customize the speed. It will by defa
 
 Thus, change the array how you see fit to make it work for you. I've set it up to work for my GPU as mine can only be at 59 speed at minimum.
 
-Also, you can change the code. Currently, I have it set so that if the temp is greater than `80°C`, then it adds 20 to the speed_output variable, thus making the fan speed `100%`. It also ensures the fan speed does not go over 100%.
+Also, you can change the code. Currently, I have it set so that if the temp is incremented from `70°C` to `85°C`, thus making the fan speed `100%` at `85°C`. It also ensures the fan speed does not go over 100%.
 
-Thus, if you want to remove or change it, going to 100% once it hits 80°C, then the code is at this [Line](https://github.com/UnknownSuperficialNight/nvidia-fan-control/blob/main/src/calculations.rs#L17)
+Thus, if you want to remove or change it, going to 100% once it hits 85°C, then the code is at this [Line](https://github.com/UnknownSuperficialNight/nvidia-fan-control/blob/main/src/calculations.rs#L18)

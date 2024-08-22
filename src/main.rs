@@ -44,7 +44,7 @@ pub const GPU_NUMBER: u8 = 0;
 
 // Finding the nearest neighbor to the current temperature and setting the speed accordingly using
 // this array.
-pub const SPEED: [u8; 10] = [10, 20, 30, 40, 59, 70, 80, 90, 95, 100];
+pub const SPEED: [u8; 10] = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
 
 // Used for checking for updates
 const fn get_version() -> &'static str {

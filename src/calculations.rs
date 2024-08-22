@@ -14,8 +14,22 @@ pub fn diff_func(temp: u8) -> u8 {
         }
     });
 
-    if temp > 80 {
-        speed_output = speed_output.saturating_add(20);
+    if temp > 70 {
+        let increment = match temp {
+            70 => 2,
+            72 => 4,
+            74 => 6,
+            78 => 3,
+            80 => 5,
+            81 => 10,
+            82 => 12,
+            83 => 14,
+            84 => 16,
+            85..=u8::MAX => 15,
+            _ => 0,
+        };
+
+        speed_output = speed_output.saturating_add(increment);
     }
 
     speed_output.min(100)
