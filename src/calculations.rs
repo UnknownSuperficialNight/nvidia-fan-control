@@ -14,7 +14,7 @@ pub fn diff_func(temp: u8) -> u8 {
         }
     });
 
-    if temp > 70 {
+    if temp >= 70 {
         let increment = match temp {
             70 => 2,
             72 => 4,
