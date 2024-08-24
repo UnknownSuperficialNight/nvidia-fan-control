@@ -66,6 +66,7 @@ fn check_sudo() {
     }
 }
 
+// Used to find if the user has a supported gpu
 fn find_gpu_manufacturer() -> u8 {
     let output = match Command::new("lspci").arg("-nnk").output() {
         Ok(output) => output,
@@ -81,7 +82,8 @@ fn find_gpu_manufacturer() -> u8 {
     } else if output_str.contains("amdgpu") {
         1
     } else {
-        255
+        eprintln!("Error: Unknown GPU or no GPU found");
+        exit(1)
     }
 }
 
@@ -134,18 +136,33 @@ fn get_current_exe_dir() -> String {
 }
 
 fn main() {
+    // Make sure the executing user is sudo
     check_sudo();
 
-    // Added if statement here for later amd gpu intergration
-    let gpu_manufacturer = find_gpu_manufacturer();
+    // Set flags/arguments
+    let args = command!()
+        .disable_version_flag(true)
+        .arg(Arg::new("skip-update-check").short('s').long("skip-update").help("Skip the update check").action(ArgAction::SetTrue))
+        .arg(Arg::new("update-now").short('u').long("update").help("update the binary to a new version if available").action(ArgAction::SetTrue))
+        .arg(Arg::new("no-tui").short('n').long("no_tui_output").help("no text user interface output (useful for running in the background)").action(ArgAction::SetTrue))
+        .arg(Arg::new("version-num").short('v').long("version").help("Display the current version").action(ArgAction::SetTrue))
+        .arg(Arg::new("test-true").short('t').long("test_fan").help("Test by setting gpu fan to 100% so you know it has control over the gpu (nvidia only)").action(ArgAction::SetTrue))
+        .arg(Arg::new("fahrenheit-id").short('f').long("fahrenheit").help("Use fahrenheit instead of celsius").action(ArgAction::SetTrue))
+        .arg(Arg::new("force-nvidia").long("nvidia").help("Force the detected gpu to be nvidia").action(ArgAction::SetTrue))
+        .arg(Arg::new("force-amd").long("amd").help("Force the detected gpu to be amd").action(ArgAction::SetTrue))
+        .get_matches();
 
+    // Auto detects gpu to target unless overridden with --amd or --nvidia
+    let gpu_manufacturer = if args.get_flag("force-amd") {
+        1
+    } else if args.get_flag("force-nvidia") {
+        0
+    } else {
+        find_gpu_manufacturer()
+    };
+
+    // Defines what second interval amd or nvidia ui it refreshed at
     let refresh_time = define_refresh_time(gpu_manufacturer);
-
-    // If find_gpu_manufacturer can't find a supported gpu exit the program
-    if gpu_manufacturer == 255 {
-        eprintln!("Error: Unknown GPU or no GPU found");
-        exit(1)
-    }
 
     // Create a channel for communication between threads
     let (tx, rx) = mpsc::channel();
@@ -177,16 +194,6 @@ fn main() {
         exit(0);
     });
 
-    // Set flags/arguments
-    let args = command!()
-        .disable_version_flag(true)
-        .arg(Arg::new("skip-update-check").short('s').long("skip-update").help("Skip the update check").action(ArgAction::SetTrue))
-        .arg(Arg::new("update-now").short('u').long("update").help("update the binary to a new version if available").action(ArgAction::SetTrue))
-        .arg(Arg::new("no-tui").short('n').long("no_tui_output").help("no text user interface output (useful for running in the background)").action(ArgAction::SetTrue))
-        .arg(Arg::new("version-num").short('v').long("version").help("Display the current version").action(ArgAction::SetTrue))
-        .arg(Arg::new("test-true").short('t').long("test_fan").help("Test by setting gpu fan to 100% so you know it has control over the gpu").action(ArgAction::SetTrue))
-        .arg(Arg::new("fahrenheit-id").short('f').long("fahrenheit").help("Use fahrenheit instead of celsius").action(ArgAction::SetTrue))
-        .get_matches();
     {
         // Standard update check on boot up prints a message if there is a newer version
         if !args.get_flag("skip-update-check") && !args.get_flag("update-now") {
@@ -372,7 +379,7 @@ fn main() {
         let speed_output = diff_func(temp);
         if args.get_flag("no-tui") {
             if speed_output != Into::<u8>::into(temp_capture_call) {
-                // Added if statement here for later amd gpu intergration
+                //TODO Added if statement here for later amd gpu intergration
                 if gpu_manufacturer == 0 {
                     for faninc in 0..FAN_AMOUNT {
                         Command::new("nvidia-settings").arg("-a").arg(&format!("GPUTargetFanSpeed[fan:{}]={}", faninc, speed_output)).output().expect("nvidia-settings command failed to execute");
@@ -486,7 +493,7 @@ fn main() {
                         width = speed_output_center + fan_speed_output_str.len()
                     );
                 }
-                // Added if statement here for later amd gpu intergration
+                //TODO Added if statement here for later amd gpu intergration
                 if gpu_manufacturer == 0 {
                     if speed_output == Into::<u8>::into(temp_capture_call) {
                         println!("{: >width$}", skip, width = skip_center + skip.len());
