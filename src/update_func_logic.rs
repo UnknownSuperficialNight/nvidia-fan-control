@@ -32,8 +32,8 @@ pub fn is_current_version_older(repo_url: &str, compiled_version: &str) -> Resul
     Ok((is_older, repo_version.to_string()))
 }
 
-// Compares two version strings to determine if the repository version is newer than the compiled
-// version.
+/// Compares two version strings to determine if the repository version is newer than the compiled
+/// version.
 fn compare_versions(compiled_version: &str, repo_version: &str) -> Result<bool, Box<dyn std::error::Error>> {
     let compiled_parts: Vec<u64> = compiled_version.split('.').map(|part| part.parse::<u64>()).collect::<Result<_, _>>()?;
     let repo_parts: Vec<u64> = repo_version.split('.').map(|part| part.parse::<u64>()).collect::<Result<_, _>>()?;

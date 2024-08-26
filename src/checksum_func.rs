@@ -1,4 +1,3 @@
-use std::fmt::Write;
 use std::fs::File;
 use std::io::Read;
 use std::process::exit;
@@ -18,22 +17,24 @@ pub fn compute_file_sha256(file_path: &str) -> String {
     // Initialize SHA-256 hasher
     let mut hasher = Sha256::new();
 
-    // Read the entire file and update hasher
-    let mut buffer = Vec::new();
-    if file.read_to_end(&mut buffer).is_err() {
-        eprintln!("Error Read the entire file and update hasher");
-        exit(1);
+    // Read and update hasher in chunks
+    let mut buffer = [0; 8192];
+    loop {
+        match file.read(&mut buffer) {
+            Ok(0) => break,
+            Ok(n) => hasher.update(&buffer[..n]),
+            Err(err) => {
+                eprintln!("Error reading the file: {}", err);
+                exit(1);
+            }
+        }
     }
-    hasher.update(&buffer);
 
     // Finalize the hash computation
     let result = hasher.finalize();
 
     // Convert the hash result to hexadecimal string
-    let mut hash_string = String::new();
-    for byte in result {
-        write!(&mut hash_string, "{:02x}", byte).expect("Failed to write to String");
-    }
+    let hash_string: String = result.iter().map(|byte| format!("{:02x}", byte)).collect();
 
     hash_string
 }
