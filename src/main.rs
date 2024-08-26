@@ -351,6 +351,8 @@ fn main() {
     let mut amd_min_temp: Option<f32> = None;
     let mut amd_max_temp: Option<f32> = None;
 
+    let mut amd_sleep_skip: bool = false;
+
     let rgb_array: RgbColor = RgbColor::new();
     loop {
         let temp: u8;
@@ -363,7 +365,9 @@ fn main() {
 
             amd_current_rpm = amdgpu_info.get("Current RPM").map_or_else(
                 || {
-                    println!("Error getting Current RPM info for amd. This could be due to a missing sensor for your GPU model.");
+                    if !amd_sleep_skip && !args.get_flag("force-amd") {
+                        println!("Error getting Current RPM info for amd. This could be due to a missing sensor for your GPU model.");
+                    }
                     None
                 },
                 |&value| Some(value),
@@ -371,7 +375,9 @@ fn main() {
 
             amd_fan_speed_percentage = amdgpu_info.get("Fan Speed Percentage").map_or_else(
                 || {
-                    println!("Error getting Fan Speed Percentage info for amd. This could be due to a missing sensor for your GPU model.");
+                    if !amd_sleep_skip && !args.get_flag("force-amd") {
+                        println!("Error getting Fan Speed Percentage info for amd. This could be due to a missing sensor for your GPU model.");
+                    }
                     None
                 },
                 |&value| Some(value as u8),
@@ -381,7 +387,9 @@ fn main() {
                 .get("Edge Temp")
                 .map_or_else(
                     || {
-                        println!("Error getting temp info for amd. This could be due to a missing sensor for your GPU model.");
+                        if !amd_sleep_skip && !args.get_flag("force-amd") {
+                            println!("Error getting temp info for amd. This could be due to a missing sensor for your GPU model.");
+                        }
                         None
                     },
                     |&value| Some(value as u8),
@@ -390,7 +398,9 @@ fn main() {
 
             amd_junction_temp = amdgpu_info.get("Junction Temp").map_or_else(
                 || {
-                    println!("Error getting Junction Temp info for amd. This could be due to a missing sensor for your GPU model.");
+                    if !amd_sleep_skip && !args.get_flag("force-amd") {
+                        println!("Error getting Junction Temp info for amd. This could be due to a missing sensor for your GPU model.");
+                    }
                     None
                 },
                 |&value| Some(value),
@@ -398,7 +408,9 @@ fn main() {
 
             amd_memory_temp = amdgpu_info.get("Memory Temp").map_or_else(
                 || {
-                    println!("Error getting Memory Temp info for amd. This could be due to a missing sensor for your GPU model.");
+                    if !amd_sleep_skip && !args.get_flag("force-amd") {
+                        println!("Error getting Memory Temp info for amd. This could be due to a missing sensor for your GPU model.");
+                    }
                     None
                 },
                 |&value| Some(value),
@@ -406,7 +418,9 @@ fn main() {
 
             amd_min_temp = amdgpu_info.get("Min RPM").map_or_else(
                 || {
-                    println!("Error getting Min RPM info for amd. This could be due to a missing sensor for your GPU model.");
+                    if !amd_sleep_skip && !args.get_flag("force-amd") {
+                        println!("Error getting Min RPM info for amd. This could be due to a missing sensor for your GPU model.");
+                    }
                     None
                 },
                 |&value| Some(value),
@@ -414,7 +428,9 @@ fn main() {
 
             amd_max_temp = amdgpu_info.get("Max RPM").map_or_else(
                 || {
-                    println!("Error getting Max RPM info for amd. This could be due to a missing sensor for your GPU model.");
+                    if !amd_sleep_skip && !args.get_flag("force-amd") {
+                        println!("Error getting Max RPM info for amd. This could be due to a missing sensor for your GPU model.");
+                    }
                     None
                 },
                 |&value| Some(value),
@@ -422,8 +438,10 @@ fn main() {
 
             if !args.get_flag("force-amd")
                 && (amd_current_rpm.is_none() || amd_fan_speed_percentage.is_none() || amd_junction_temp.is_none() || amd_memory_temp.is_none() || amd_min_temp.is_none() || amd_max_temp.is_none())
+                && !amd_sleep_skip
             {
                 sleep(5.0);
+                amd_sleep_skip = true;
             }
         } else {
             eprintln!("Error: Unknown GPU or no GPU found");
