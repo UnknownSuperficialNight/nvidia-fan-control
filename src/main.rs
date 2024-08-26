@@ -171,6 +171,42 @@ fn get_current_exe_dir() -> String {
     current_exe_dir
 }
 
+/// Prints a colored string centered in the terminal
+///
+/// # Arguments
+/// * `width` - The width of the terminal
+/// * `format_str` - The primary format string for the output
+/// * `value` - The value to be inserted into the format string
+/// * `min_temp` - The minimum temperature for color scaling
+/// * `max_temp` - The maximum temperature for color scaling
+/// * `rgb_array` - The RgbColor struct for color calculations
+/// * `use_alt_str` - Boolean flag to use the alternate string
+/// * `alt_format_str` - The alternate format string (used if use_alt_str is true)
+fn print_centered_colored_string(
+    width: usize,
+    format_str: &str,
+    value: Option<f32>,
+    min_temp: Option<f32>,
+    max_temp: Option<f32>,
+    rgb_array: &RgbColor,
+    use_alt_str: bool,
+    alt_format_str: Option<&str>,
+) {
+    if let (Some(value), Some(min_temp), Some(max_temp)) = (value, min_temp, max_temp) {
+        // Calculate the color based on the temperature range
+        let color = rgb_temp_f32(min_temp, max_temp, rgb_array, value);
+        // Choose the appropriate format string
+        let chosen_format_str = if use_alt_str { alt_format_str.unwrap_or(format_str) } else { format_str };
+        // Format the string with the provided value
+        let formatted_value = if use_alt_str { celcius_to_fahrenheit(value as u8) as f32 } else { value };
+        let formatted_str = format!("{}", chosen_format_str.replace("{}", &formatted_value.to_string()));
+        // Calculate the center position for the string
+        let center = (width - formatted_str.len()) / 2;
+        // Print the formatted string with calculated color and centering
+        println!("{: >width$}", formatted_str.truecolor(color.0, color.1, color.2), width = center + formatted_str.len());
+    }
+}
+
 fn main() {
     // Make sure the executing user is sudo
     check_sudo();
@@ -308,12 +344,12 @@ fn main() {
     let mut vertical_center: usize = 0;
 
     // Define amd specific variables
-    let mut amd_current_rpm: f32 = 0.0;
-    let mut amd_fan_speed_percentage: u8 = 0;
-    let mut amd_junction_temp: f32 = 0.0;
-    let mut amd_memory_temp: f32 = 0.0;
-    let mut amd_min_temp: f32 = 0.0;
-    let mut amd_max_temp: f32 = 0.0;
+    let mut amd_current_rpm: Option<f32> = None;
+    let mut amd_fan_speed_percentage: Option<u8> = None;
+    let mut amd_junction_temp: Option<f32> = None;
+    let mut amd_memory_temp: Option<f32> = None;
+    let mut amd_min_temp: Option<f32> = None;
+    let mut amd_max_temp: Option<f32> = None;
 
     let rgb_array: RgbColor = RgbColor::new();
     loop {
@@ -327,59 +363,68 @@ fn main() {
 
             amd_current_rpm = amdgpu_info.get("Current RPM").map_or_else(
                 || {
-                    println!("Error getting Current RPM info for amd");
-                    exit(1);
+                    println!("Error getting Current RPM info for amd. This could be due to a missing sensor for your GPU model.");
+                    None
                 },
-                |&value| value,
+                |&value| Some(value),
             );
 
             amd_fan_speed_percentage = amdgpu_info.get("Fan Speed Percentage").map_or_else(
                 || {
-                    println!("Error getting Fan Speed Percentage info for amd");
-                    exit(1);
+                    println!("Error getting Fan Speed Percentage info for amd. This could be due to a missing sensor for your GPU model.");
+                    None
                 },
-                |&value| value as u8,
+                |&value| Some(value as u8),
             );
 
-            temp = amdgpu_info.get("Edge Temp").map_or_else(
-                || {
-                    println!("Error getting temp info for amd");
-                    exit(1);
-                },
-                |&value| value as u8,
-            );
+            temp = amdgpu_info
+                .get("Edge Temp")
+                .map_or_else(
+                    || {
+                        println!("Error getting temp info for amd. This could be due to a missing sensor for your GPU model.");
+                        None
+                    },
+                    |&value| Some(value as u8),
+                )
+                .unwrap_or(0);
 
             amd_junction_temp = amdgpu_info.get("Junction Temp").map_or_else(
                 || {
-                    println!("Error getting Junction Temp info for amd");
-                    exit(1);
+                    println!("Error getting Junction Temp info for amd. This could be due to a missing sensor for your GPU model.");
+                    None
                 },
-                |&value| value,
+                |&value| Some(value),
             );
 
             amd_memory_temp = amdgpu_info.get("Memory Temp").map_or_else(
                 || {
-                    println!("Error getting Memory Temp info for amd");
-                    exit(1);
+                    println!("Error getting Memory Temp info for amd. This could be due to a missing sensor for your GPU model.");
+                    None
                 },
-                |&value| value,
+                |&value| Some(value),
             );
 
             amd_min_temp = amdgpu_info.get("Min RPM").map_or_else(
                 || {
-                    println!("Error getting Min RPM info for amd");
-                    exit(1);
+                    println!("Error getting Min RPM info for amd. This could be due to a missing sensor for your GPU model.");
+                    None
                 },
-                |&value| value,
+                |&value| Some(value),
             );
 
             amd_max_temp = amdgpu_info.get("Max RPM").map_or_else(
                 || {
-                    println!("Error getting Max RPM info for amd");
-                    exit(1);
+                    println!("Error getting Max RPM info for amd. This could be due to a missing sensor for your GPU model.");
+                    None
                 },
-                |&value| value,
+                |&value| Some(value),
             );
+
+            if !args.get_flag("force-amd")
+                && (amd_current_rpm.is_none() || amd_fan_speed_percentage.is_none() || amd_junction_temp.is_none() || amd_memory_temp.is_none() || amd_min_temp.is_none() || amd_max_temp.is_none())
+            {
+                sleep(5.0);
+            }
         } else {
             eprintln!("Error: Unknown GPU or no GPU found");
             exit(1);
@@ -448,52 +493,27 @@ fn main() {
 
                 if gpu_manufacturer == 1 {
                     // Calculate junction pos
-                    let amd_junction_temp_colour = rgb_temp_f32(50.0, 95.0, &rgb_array, amd_junction_temp);
-                    let amd_junction_temp_str: String = if args.get_flag("fahrenheit-id") {
-                        format!("Junction/hotspot: {}°F", celcius_to_fahrenheit(amd_junction_temp as u8))
-                    } else {
-                        format!("Junction/hotspot: {}°C", amd_junction_temp)
-                    };
-                    let amd_junction_temp_center = (width - amd_junction_temp_str.len()) / 2;
-                    println!(
-                        "{: >width$}",
-                        amd_junction_temp_str.truecolor(amd_junction_temp_colour.0, amd_junction_temp_colour.1, amd_junction_temp_colour.2),
-                        width = amd_junction_temp_center + amd_junction_temp_str.len()
+                    print_centered_colored_string(
+                        width,
+                        "Junction/hotspot: {}°C",
+                        amd_junction_temp,
+                        Some(50.0),
+                        Some(95.0),
+                        &rgb_array,
+                        args.get_flag("fahrenheit-id"),
+                        Some("Junction/hotspot: {}°F"),
                     );
 
                     // Calculate Vram/Memory pos
-                    let amd_memory_temp_colour = rgb_temp_f32(60.0, 90.0, &rgb_array, amd_memory_temp);
-                    let amd_memory_temp_str: String = if args.get_flag("fahrenheit-id") {
-                        format!("Memory/vram temp: {}°F", celcius_to_fahrenheit(amd_memory_temp as u8))
-                    } else {
-                        format!("Memory/vram temp: {}°C", amd_memory_temp)
-                    };
-                    let amd_memory_temp_center = (width - amd_memory_temp_str.len()) / 2;
-                    println!(
-                        "{: >width$}",
-                        amd_memory_temp_str.truecolor(amd_memory_temp_colour.0, amd_memory_temp_colour.1, amd_memory_temp_colour.2),
-                        width = amd_memory_temp_center + amd_memory_temp_str.len()
-                    );
+                    print_centered_colored_string(width, "Memory/vram temp: {}°C", amd_memory_temp, Some(60.0), Some(90.0), &rgb_array, args.get_flag("fahrenheit-id"), Some("Memory/vram temp: {}°F"));
 
                     // Calculate rpm pos
-                    let amd_current_rpm_colour = rgb_temp_f32(amd_min_temp, amd_max_temp, &rgb_array, amd_current_rpm);
-                    let amd_current_rpm_str: String = format!("Current fan RPM: {}", amd_current_rpm);
-                    let amd_current_rpm_center = (width - amd_current_rpm_str.len()) / 2;
-                    println!(
-                        "{: >width$}",
-                        amd_current_rpm_str.truecolor(amd_current_rpm_colour.0, amd_current_rpm_colour.1, amd_current_rpm_colour.2),
-                        width = amd_current_rpm_center + amd_current_rpm_str.len()
-                    );
+                    print_centered_colored_string(width, "Current fan RPM: {}", amd_current_rpm, amd_min_temp, amd_max_temp, &rgb_array, false, Some(""));
 
                     // Calculate fanspeed pos
-                    let amd_fan_speed_percentage_colour = rgb_temp(&rgb_array, amd_fan_speed_percentage);
-                    let amd_fan_speed_percentage_str: String = format!("Current fan speed: {}%", amd_fan_speed_percentage);
-                    let amd_fan_speed_percentage_center = (width - amd_fan_speed_percentage_str.len()) / 2;
-                    println!(
-                        "{: >width$}",
-                        amd_fan_speed_percentage_str.truecolor(amd_fan_speed_percentage_colour.0, amd_fan_speed_percentage_colour.1, amd_fan_speed_percentage_colour.2),
-                        width = amd_fan_speed_percentage_center + amd_fan_speed_percentage_str.len()
-                    );
+                    if let Some(fan_speed_percentage) = amd_fan_speed_percentage {
+                        print_centered_colored_string(width, "Current fan speed: {}%", Some(fan_speed_percentage as f32), Some(30.0), Some(85.0), &rgb_array, false, Some(""));
+                    }
                 } else {
                     println!(
                         "{: >width$}",
