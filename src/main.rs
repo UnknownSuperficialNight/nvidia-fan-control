@@ -27,33 +27,37 @@ use amdgpu::get_amdgpu;
 mod compile_flag_helper;
 use compile_flag_helper::{CAPITALIZED_BINARY_NAME, FAN_AMOUNT};
 
-// Defines interval to refresh screen and screen boundries calculations
+/// Defines the interval for refreshing the screen and recalculating screen boundaries.
+/// This function determines the appropriate refresh rate based on the GPU manufacturer.
 fn define_refresh_time(gpu_manufacturer: u8) -> f32 {
     if gpu_manufacturer == 0 {
-        5.0 // Refresh rate on nvidia gpu here format in seconds
+        0.3 // Refresh rate for NVIDIA GPUs (in seconds)
     } else if gpu_manufacturer == 1 {
-        0.1 // Refresh rate on amdgpu here format in seconds
+        0.1 // Refresh rate for AMD GPUs (in seconds)
     } else {
         eprintln!("Error: Unknown GPU or no GPU found");
         exit(1)
     }
 }
 
-// Input your gpu number here (if you have 1 gpu its normally nought so just leave it)
+/// Specify the GPU number (0 for the first GPU, 1 for the second, etc.)
+/// If you have only one GPU, leave this as 0
 pub const GPU_NUMBER: u8 = 0;
 
-// Finding the nearest neighbor to the current temperature and setting the speed accordingly using
-// this array.
+/// This array defines fan speeds (in percentages) corresponding to different temperature thresholds.
+/// The index of each speed value represents a temperature range.
+/// The program uses this array to determine the appropriate fan speed based on the current GPU temperature.
+/// It finds the nearest matching temperature and sets the fan speed to the corresponding value in this array.
 pub const SPEED: [u8; 10] = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
 
-// Used for checking for updates
+/// Used for checking for updates
 const fn get_version() -> &'static str {
     env!("CARGO_PKG_VERSION")
 }
 
 const VERSION: &str = get_version();
 
-// Check if user is root
+/// Check if user is root
 fn check_sudo() {
     if let Ok(user) = std::env::var("USER") {
         if user != "root" {
@@ -66,7 +70,7 @@ fn check_sudo() {
     }
 }
 
-// Used to find if the user has a supported gpu
+/// Used to find if the user has a supported gpu
 fn find_gpu_manufacturer() -> u8 {
     let output = match Command::new("lspci").arg("-nnk").output() {
         Ok(output) => output,
@@ -87,17 +91,17 @@ fn find_gpu_manufacturer() -> u8 {
     }
 }
 
-// Convert celcius to fahrenheit for the americans
+/// Convert celcius to fahrenheit for the americans
 fn celcius_to_fahrenheit(input_celcius: u8) -> u8 {
     (input_celcius as f32 * 1.8 + 32.0) as u8
 }
 
-// Sleep calling thread for x seconds
+/// Sleep calling thread for x seconds
 fn sleep(input_sec: f32) {
     thread::sleep(Duration::from_secs_f32(input_sec));
 }
 
-// Get path of the current binary at runtime
+/// Retrieves the path of the current executable binary at runtime.
 fn get_binary_path() -> String {
     let binary_path = if let Ok(path) = env::current_exe() {
         if let Some(file_name) = path.file_name() {
@@ -116,6 +120,38 @@ fn get_binary_path() -> String {
         exit(0);
     };
     binary_path
+}
+
+fn setup_ctrl_c_handler(gpu_manufacturer: u8) {
+    // Create a channel for communication between threads
+    let (tx, rx) = mpsc::channel();
+
+    // Set up the Ctrl+C handler
+    ctrlc::set_handler(move || {
+        // Send a signal on the channel when Ctrl+C is pressed
+        tx.send(()).expect("Could not send signal on channel.");
+    })
+    .expect("Error setting Ctrl+C handler");
+
+    // Spawn a new thread to execute the cleanup function
+    thread::spawn(move || {
+        // Wait for the signal from the main thread
+        rx.recv().expect("Could not receive from channel.");
+
+        // Added if statement here for later AMD GPU integration
+        if gpu_manufacturer == 0 {
+            // Execute the cleanup function for NVIDIA
+            cleanup_nvidia();
+        } else if gpu_manufacturer == 1 {
+            print!("\x1B[?25h");
+        } else {
+            eprintln!("Error: Unknown GPU or no GPU found");
+            exit(1);
+        }
+
+        // Exit the program
+        exit(0);
+    });
 }
 
 fn get_current_exe_dir() -> String {
@@ -164,43 +200,15 @@ fn main() {
     // Defines what second interval amd or nvidia ui it refreshed at
     let refresh_time = define_refresh_time(gpu_manufacturer);
 
-    // Create a channel for communication between threads
-    let (tx, rx) = mpsc::channel();
-
-    // Set up the Ctrl+C handler
-    ctrlc::set_handler(move || {
-        // Send a signal on the channel when Ctrl+C is pressed
-        tx.send(()).expect("Could not send signal on channel.");
-    })
-    .expect("Error setting Ctrl+C handler");
-
-    // Spawn a new thread to execute the cleanup function
-    thread::spawn(move || {
-        // Wait for the signal from the main thread
-        rx.recv().expect("Could not receive from channel.");
-
-        // Added if statement here for later amd gpu intergration
-        if gpu_manufacturer == 0 {
-            // Execute the cleanup function for nvidia
-            cleanup_nvidia();
-        } else if gpu_manufacturer == 1 {
-            print!("\x1B[?25h");
-        } else {
-            eprintln!("Error: Unknown GPU or no GPU found");
-            exit(1);
-        }
-
-        // Exit the program
-        exit(0);
-    });
+    setup_ctrl_c_handler(gpu_manufacturer);
 
     {
-        // Standard update check on boot up prints a message if there is a newer version
+        // Performs a standard version check at startup and notifies if an update is available
         if !args.get_flag("skip-update-check") && !args.get_flag("update-now") {
             let checking_repo_version = is_current_version_older("https://github.com/UnknownSuperficialNight/nvidia-fan-control", VERSION);
             let (is_older, repo_version) = match checking_repo_version {
                 Ok((is_older, version)) => (is_older, version),
-                _ => (false, String::from("0.0.0")), // Default values in case of an error
+                Err(_) => (false, String::from("0.0.0")), // Default values in the event of an error
             };
             if is_older {
                 let binary_path = get_binary_path();
@@ -211,13 +219,13 @@ fn main() {
             }
         }
 
-        // Update to the new version on git i.e (Remove current binary download a new replacement binary in
-        // its place)
+        // Update the binary to the latest version from the repository
+        // This process involves removing the current binary and downloading a new replacement
         if args.get_flag("update-now") {
             let checking_repo_version = is_current_version_older("https://github.com/UnknownSuperficialNight/nvidia-fan-control", VERSION);
             let repo_version = match checking_repo_version {
                 Ok((_, version)) => version,
-                Err(_) => String::from("0.0.0"), // Default value in case of an error
+                Err(_) => String::from("0.0.0"), // Default to initial version if unable to retrieve current version
             };
 
             let binary_path = get_binary_path();
@@ -235,7 +243,7 @@ fn main() {
                 }
             }
 
-            // Get a sha256sum of the updated binary
+            // Calculate the SHA-256 checksum of the updated binary
             let updated_bin_sha256 = compute_file_sha256(file_path_tmp);
 
             if repo_bin_sha256_result == updated_bin_sha256 {
@@ -258,13 +266,13 @@ fn main() {
             exit(0);
         }
 
-        // Print current compiled version number
+        // Display the current version number of the compiled binary
         if args.get_flag("version-num") {
             println!("Version: {}", VERSION);
             exit(0);
         }
 
-        // Test Gpu but forcing it to 100% to make sure that the users gpu is responding to commands
+        // Test GPU responsiveness by setting fan speed to 100%
         if args.get_flag("test-true") {
             println!("Test starting");
 
@@ -277,7 +285,7 @@ fn main() {
                 eprintln!("Error: Unknown GPU or no GPU found");
                 exit(1);
             }
-            // Wait and prompt the user to press Ctrl+C to exit
+            // Pause execution and instruct the user to terminate the program using Ctrl+C
             println!("Press Ctrl+C to exit");
             loop {
                 sleep(1.0);

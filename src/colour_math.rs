@@ -1,12 +1,14 @@
-// Determine the RGB value based on the temperature
+/// Calculates the RGB color value corresponding to a given temperature.
 pub fn rgb_temp(rgb: &RgbColor, temp: u8) -> (u8, u8, u8) {
-    // Call the main calculate function with predetermined range
+    // Invoke the primary calculation function with a predefined temperature range
     rgb_temp_f32(30.0, 85.0, rgb, temp as f32)
 }
 
-// Determine the RGB value based on the temperature
+/// Calculates the RGB color value corresponding to a given temperature.
+///
+/// This function maps temperatures to RGB values within a predefined range.
 pub fn rgb_temp_f32(min: f32, max: f32, rgb: &RgbColor, temp: f32) -> (u8, u8, u8) {
-    // Define colour ranges
+    // Define temperature-to-color mapping ranges
     let min_val = min;
     let max_val = max;
     let total_gradients = RgbColor::total_colors(rgb);
@@ -24,7 +26,6 @@ pub fn rgb_temp_f32(min: f32, max: f32, rgb: &RgbColor, temp: f32) -> (u8, u8, u
     match returned_temp {
         Some((r, g, b)) => (r, g, b),
         _none => {
-            // Print the error message to the standard error stream
             eprintln!("Error: returned_temp is None");
 
             (0, 0, 0)
@@ -81,9 +82,9 @@ impl RgbColor {
     }
 }
 
-// Used to get the selected gradient based on the input mapped to the array
+/// Calculates the appropriate gradient index based on the input temperature mapped to the color array.
 fn calculate_gradient_index(temp: f32, min_val: f32, max_val: f32, total_gradients: f32) -> u8 {
-    // Ensure temp is within the range
+    // Validate that the temperature is within the specified range
     if temp < min_val || temp > max_val {
         eprintln!("Error: Temperature is out of the specified range.");
         std::process::exit(1);
