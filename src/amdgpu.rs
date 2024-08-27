@@ -16,10 +16,10 @@ const HWMON_PATH: &str = "/sys/class/hwmon";
 /// # Returns
 /// - `Some(HashMap<&'static str, f32>)`: A collection of calculated metrics if successful
 /// - `None`: If any step in the process fails
-pub fn get_amdgpu() -> Option<HashMap<&'static str, f32>> {
+pub fn get_amdgpu_fan_metrics() -> Option<HashMap<&'static str, f32>> {
     let hwmon = find_amdgpu_hwmon().expect("Failed to find amdgpu hwmon");
-    let amdgpu_paths = get_amdgpu_info_paths(hwmon);
-    amdgpu_calc(amdgpu_paths)
+    let amdgpu_paths = get_amdgpu_fan_info_paths(hwmon);
+    amdgpu_fan_calc(amdgpu_paths)
 }
 
 /// Locates the hwmon directory for the AMD GPU.
@@ -48,7 +48,7 @@ fn find_amdgpu_hwmon() -> Option<PathBuf> {
 /// This function scans the given hwmon directory for specific files related to
 /// AMD GPU metrics, including fan speeds and temperatures. It returns a HashMap
 /// containing the relevant file paths if found.
-fn get_amdgpu_info_paths(hwmon_path: PathBuf) -> Option<HashMap<&'static str, DirEntry>> {
+fn get_amdgpu_fan_info_paths(hwmon_path: PathBuf) -> Option<HashMap<&'static str, DirEntry>> {
     let mut file_paths = HashMap::with_capacity(6);
 
     for entry in fs::read_dir(hwmon_path).unwrap() {
@@ -98,7 +98,7 @@ fn get_amdgpu_info_paths(hwmon_path: PathBuf) -> Option<HashMap<&'static str, Di
 ///
 /// The function returns a HashMap containing processed metrics if successful, or None if
 /// critical data is missing or cannot be parsed.
-fn amdgpu_calc(amdgpu_paths: Option<HashMap<&str, DirEntry>>) -> Option<HashMap<&str, f32>> {
+fn amdgpu_fan_calc(amdgpu_paths: Option<HashMap<&str, DirEntry>>) -> Option<HashMap<&str, f32>> {
     let mut result = HashMap::new();
     let mut rpm_values: [Option<f32>; 3] = [None; 3];
 

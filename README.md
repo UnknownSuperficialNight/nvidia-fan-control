@@ -13,7 +13,7 @@ The `nvidia-fan-control` utility is a user-friendly tool designed for controllin
 - **Open Source Driver**: Compatibility with the open-source `nouveau` driver has not been tested but could potentially work.
 
 ### AMDGPU
-- **Monitoring support for amdgpu**: Tested on (RDNA3/RDNA2)
+- **Monitoring support for amdgpu**: Tested on (RDNA3/RDNA2/Polaris 30)
 
 ### Usage Instructions
 To start the automatic fan control:
@@ -77,13 +77,13 @@ The line at the top is 0 each line down is then incremented by one so if your gp
 ### SPEED:
 SPEED array is the most difficult to explain but here is a TLDR:
 
-It finds the nearest number to your current gpu temp and selects the fan speed to run at that speed 
+It finds the nearest number to your current gpu temp and selects the fan speed to run at that speed
 
 Example:
 
 `[25 50 75 100]`: In this case if your gpu temp is `63` the closest number in the array is `50` thus the speed is `50%` until it passes over the threshold of `65` since `66` is closer to 75 than 50 it changes the gpu speed to `75%`.
 
-# HOW IT WORKS 
+# HOW IT WORKS
 
 The speed array in both versions is used to customize the speed. It will by default find the closest value relative to the current temperature. So, if the lowest value in the array is `59°C` and your current temp is `30°C`, then `59%` speed will be selected. However, if in the array you have the current temp of `30°C` and in the speed array you have these values `[26, 35, 59, 80]`, then in this case, it will choose `26` as it's closest to the current temp.
 

@@ -22,7 +22,7 @@ mod checksum_func;
 use checksum_func::compute_file_sha256;
 
 mod amdgpu;
-use amdgpu::get_amdgpu;
+use amdgpu::get_amdgpu_fan_metrics;
 
 mod compile_flag_helper;
 use compile_flag_helper::{CAPITALIZED_BINARY_NAME, FAN_AMOUNT};
@@ -212,17 +212,24 @@ fn main() {
     check_sudo();
 
     // Set flags/arguments
-    let args = command!()
+    let mut args = command!()
         .disable_version_flag(true)
-        .arg(Arg::new("skip-update-check").short('s').long("skip-update").help("Skip the update check").action(ArgAction::SetTrue))
-        .arg(Arg::new("update-now").short('u').long("update").help("update the binary to a new version if available").action(ArgAction::SetTrue))
-        .arg(Arg::new("no-tui").short('n').long("no_tui_output").help("no text user interface output (useful for running in the background)").action(ArgAction::SetTrue))
-        .arg(Arg::new("version-num").short('v').long("version").help("Display the current version").action(ArgAction::SetTrue))
-        .arg(Arg::new("test-true").short('t').long("test_fan").help("Test by setting gpu fan to 100% so you know it has control over the gpu (nvidia only)").action(ArgAction::SetTrue))
-        .arg(Arg::new("fahrenheit-id").short('f').long("fahrenheit").help("Use fahrenheit instead of celsius").action(ArgAction::SetTrue))
-        .arg(Arg::new("force-nvidia").long("nvidia").help("Force the detected gpu to be nvidia").action(ArgAction::SetTrue))
-        .arg(Arg::new("force-amd").long("amd").help("Force the detected gpu to be amd").action(ArgAction::SetTrue))
-        .get_matches();
+        .arg(Arg::new("skip-update-check").short('s').long("skip-update").help("Skip checking for updates").action(ArgAction::SetTrue))
+        .arg(Arg::new("update-now").short('u').long("update").help("Update to the latest version if available").action(ArgAction::SetTrue))
+        .arg(Arg::new("no-tui").short('n').long("no_tui_output").help("Run without text user interface (for background operation)").action(ArgAction::SetTrue))
+        .arg(Arg::new("version-num").short('v').long("version").help("Show current version").action(ArgAction::SetTrue))
+        .arg(Arg::new("test-true").short('t').long("test_fan").help("Test GPU fan control by setting to 100% (NVIDIA only)").action(ArgAction::SetTrue))
+        .arg(Arg::new("fahrenheit-id").short('f').long("fahrenheit").help("Display temperatures in Fahrenheit").action(ArgAction::SetTrue));
+
+    args = args.arg(Arg::new("force-nvidia").long("nvidia").help("Force NVIDIA GPU detection").action(ArgAction::SetTrue));
+    args = args.arg(Arg::new("force-amd").long("amd").help("Force AMD GPU detection").action(ArgAction::SetTrue));
+
+    #[cfg(debug_assertions)]
+    {
+        args = args.arg(Arg::new("simulate-temp-range").long("str-debug").help("Simulate fan speeds for all possible temperature ranges (debug only)").action(ArgAction::SetTrue));
+    }
+
+    let args = args.get_matches();
 
     // Auto detects gpu to target unless overridden with --amd or --nvidia
     let gpu_manufacturer = if args.get_flag("force-amd") {
@@ -308,6 +315,16 @@ fn main() {
             exit(0);
         }
 
+        #[cfg(debug_assertions)]
+        if args.get_flag("simulate-temp-range") {
+            println!("Simulating all temperature ranges:");
+            for temp in 10..=100 {
+                let speed = diff_func(temp);
+                println!("Input Temperature: {}°C, Output Fan Speed: {}%", temp, speed);
+            }
+            exit(0);
+        }
+
         // Test GPU responsiveness by setting fan speed to 100%
         if args.get_flag("test-true") {
             println!("Test starting");
@@ -361,9 +378,9 @@ fn main() {
         if gpu_manufacturer == 0 {
             temp = get_current_nvidia_temp();
         } else if gpu_manufacturer == 1 {
-            let amdgpu_info = get_amdgpu().unwrap();
+            let amdgpu_fan_metrics = get_amdgpu_fan_metrics().unwrap();
 
-            amd_current_rpm = amdgpu_info.get("Current RPM").map_or_else(
+            amd_current_rpm = amdgpu_fan_metrics.get("Current RPM").map_or_else(
                 || {
                     if !amd_sleep_skip && !args.get_flag("force-amd") {
                         println!("Error getting Current RPM info for amd. This could be due to a missing sensor for your GPU model.");
@@ -373,7 +390,7 @@ fn main() {
                 |&value| Some(value),
             );
 
-            amd_fan_speed_percentage = amdgpu_info.get("Fan Speed Percentage").map_or_else(
+            amd_fan_speed_percentage = amdgpu_fan_metrics.get("Fan Speed Percentage").map_or_else(
                 || {
                     if !amd_sleep_skip && !args.get_flag("force-amd") {
                         println!("Error getting Fan Speed Percentage info for amd. This could be due to a missing sensor for your GPU model.");
@@ -383,7 +400,7 @@ fn main() {
                 |&value| Some(value as u8),
             );
 
-            temp = amdgpu_info
+            temp = amdgpu_fan_metrics
                 .get("Edge Temp")
                 .map_or_else(
                     || {
@@ -396,7 +413,7 @@ fn main() {
                 )
                 .unwrap_or(0);
 
-            amd_junction_temp = amdgpu_info.get("Junction Temp").map_or_else(
+            amd_junction_temp = amdgpu_fan_metrics.get("Junction Temp").map_or_else(
                 || {
                     if !amd_sleep_skip && !args.get_flag("force-amd") {
                         println!("Error getting Junction Temp info for amd. This could be due to a missing sensor for your GPU model.");
@@ -406,7 +423,7 @@ fn main() {
                 |&value| Some(value),
             );
 
-            amd_memory_temp = amdgpu_info.get("Memory Temp").map_or_else(
+            amd_memory_temp = amdgpu_fan_metrics.get("Memory Temp").map_or_else(
                 || {
                     if !amd_sleep_skip && !args.get_flag("force-amd") {
                         println!("Error getting Memory Temp info for amd. This could be due to a missing sensor for your GPU model.");
@@ -416,7 +433,7 @@ fn main() {
                 |&value| Some(value),
             );
 
-            amd_min_temp = amdgpu_info.get("Min RPM").map_or_else(
+            amd_min_temp = amdgpu_fan_metrics.get("Min RPM").map_or_else(
                 || {
                     if !amd_sleep_skip && !args.get_flag("force-amd") {
                         println!("Error getting Min RPM info for amd. This could be due to a missing sensor for your GPU model.");
@@ -426,7 +443,7 @@ fn main() {
                 |&value| Some(value),
             );
 
-            amd_max_temp = amdgpu_info.get("Max RPM").map_or_else(
+            amd_max_temp = amdgpu_fan_metrics.get("Max RPM").map_or_else(
                 || {
                     if !amd_sleep_skip && !args.get_flag("force-amd") {
                         println!("Error getting Max RPM info for amd. This could be due to a missing sensor for your GPU model.");
